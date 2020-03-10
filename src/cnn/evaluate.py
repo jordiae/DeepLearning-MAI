@@ -1,6 +1,12 @@
 import torch
 import torch.nn.functional as F
 from sklearn.metrics import classification_report
+import argparse
+from cnn.models import *
+import importlib
+from torchvision import transforms
+import os
+from cnn.dataset import Mit67Dataset
 
 
 def prettify_eval(accuracy, correct, avg_loss, class_report, n_instances):
@@ -31,5 +37,25 @@ def evaluate(data_loader, model, device):
 
 
 if __name__ == '__main__':
-    # TODO command line tool, given a checkpoint and a path to data, evaluate and print result
-    pass
+    # TODO: test whether it works
+    parser = argparse.ArgumentParser(description='Evaluate a CNN for mit67')
+    parser.add_argument('--arch', type=str, help='Architecture')
+    parser.add_argument('--model', type=str, help='Path to model checkpoint')
+    parser.add_argument('--data', type=str, help='Dataset', default='256x256-split')
+    parser.add_argument('--subset', type=str, help='Data subset', default='test')
+    parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
+    parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=2)
+    args = parser.parse_args()
+    arch = importlib.import_module(args.arch)
+    model = arch()
+    model.load_state_dict(torch.load(args.model))
+    transform = transforms.Compose(
+        [transforms.ToTensor(),
+         transforms.Normalize((0.5, 0.5, 0.5),
+                              (0.5, 0.5, 0.5))])
+    dataset = Mit67Dataset(os.path.join(args.data, args.subset), transform=transform)
+    data_loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
+    device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
+    model.to(device)
+    evaluate(data_loader, model, device)
+    print(prettify_eval)
