@@ -1,4 +1,4 @@
-from utils import get_num_pixels
+from .utils import get_num_pixels
 import os
 
 
