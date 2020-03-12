@@ -4,7 +4,7 @@ import sys
 
 
 def create_slurm_script(name, queue, time):
-    script = f''' #!/bin/bash
+    script = f'''#!/bin/bash
 #SBATCH --job-name="{name}"
 #SBATCH --qos={queue}
 #SBATCH --workdir=.
