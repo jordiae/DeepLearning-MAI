@@ -15,46 +15,57 @@ from cnn.models import *
 
 def train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging):
     logging.info(args)
+    logging.info(model)
     model.train()
-    previous_valid_accuracy = 0.0
+    best_valid_accuracy = 0.0
     for epoch in range(args.epochs):
-        logging.info(f'Epoch {epoch+1}')
-
         # train step (full epoch)
-        running_loss_epoch = 0.0
-        running_loss_batch = 0.0
+        logging.info(f'epoch {epoch+1}')
+        loss_epoch = 0.0
+        total_len = len(train_loader)
+        correct = 0
         for idx, data in enumerate(train_loader):
+            if idx % total_len == int(total_len*0.1):
+                logging.info(f'{idx}/{total_len}')
             inputs, labels = data[0].to(device), data[1].to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
+            _, predicted = torch.max(outputs.data, 1)
+            correct += (predicted == labels).sum().item()
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-            running_loss_batch += loss.item()
-            if idx % 10 == 0 and idx != 0:
-                logging.info(f'10 batches loss: {running_loss_batch/10}')
-                running_loss_epoch += running_loss_batch
-                running_loss_batch = 0.0
-
-        logging.info(f'Train loss at the end of the epoch: {running_loss_epoch}')
+            loss_epoch += loss.item()
+        accuracy = 100 * correct / total_len
+        logging.info(f'train: avg_loss = {loss_epoch/total_len} | accuracy = {accuracy}')
 
         # valid step
         correct = 0
         total = 0
+        loss_val = 0
         with torch.no_grad():
             for data in valid_loader:
                 images, labels = data[0].to(device), data[1].to(device)
                 outputs = model(images)
+                loss = criterion(outputs, labels)
+                loss_val += loss
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
         accuracy = 100 * correct/total
-        logging.info(f'Validation accuracy: {accuracy}')
-        if previous_valid_accuracy < accuracy:
-            break
+        logging.info(f'valid: avg_loss = {loss_val/total} | accuracy = {accuracy}')
+
+        torch.save(model.state_dict(), 'checkpoint_last.pt')
+        if accuracy > best_valid_accuracy:
+            best_valid_accuracy = accuracy
+            torch.save(model.state_dict(), 'checkpoint_best.pt')
+            logging.info(f'best valid loss: {accuracy}')
         else:
-            previous_valid_accuracy = accuracy
-        # TODO Checkpointing
+            logging.info(f'best valid loss: {best_valid_accuracy}')
+            if args.early_stop:
+                break
+
+    logging.info(prettify_eval(evaluate(valid_loader, model, device)))
 
 
 def main():
@@ -73,67 +84,38 @@ def main():
     parser.add_argument('--early-stop', action='store_true', default=True,
                         help='Early stop in validation set with no patience')
 
-    # TODO: parameterize data augmentation...
     args = parser.parse_args()
 
-    LOG_PATH = 'train.log'
-    logging.basicConfig(filename=LOG_PATH, level=logging.INFO)
+    log_path = 'train.log'
+    logging.basicConfig(filename=log_path, level=logging.INFO)
     logging.getLogger('').addHandler(logging.StreamHandler())
 
     logging.info('===> Loading datasets')
     data_path = os.path.join('..', '..', 'data', 'mit67', args.data)
 
     transform = transforms.Compose(
-        [transforms.ToTensor(),
+        [transforms.ToTensor(),  # scale to [0,1] float tensor
          transforms.Normalize((0.5, 0.5, 0.5),
                               (0.5, 0.5, 0.5))])
     if args.augment:
-        # TODO: Refactor and maybe use transforms.RandomChoice or transforms.RandomApply
         #  to randomly pick and apply the transformations
+        transform = transforms.Compose([
+            transforms.RandomChoice([
+                transforms.RandomRotation(45),
+                transforms.RandomHorizontalFlip,
+                transforms.ColorJitter()  # Randomly change the brightness, contrast and saturation
 
-        # Randomly rotate the image
-        rotate_transform = transforms.Compose(
-            [transforms.RandomRotation(45),
-             transforms.ToTensor(),
-             transforms.Normalize((0.5, 0.5, 0.5),
-                                  (0.5, 0.5, 0.5))])
-        # Flip the image
-        flip_transform = transforms.Compose(
-            [transforms.RandomHorizontalFlip(p=1),
-             transforms.ToTensor(),
-             transforms.Normalize((0.5, 0.5, 0.5),
-                                  (0.5, 0.5, 0.5))])
+            ]),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5),
+                                 (0.5, 0.5, 0.5))
+         ])
 
-        # # Randomly selects a part of an image and erase its pixels (NOT WORKING)
-        # erase_transform = transforms.Compose(
-        #     [transforms.RandomErasing(p=1),
-        #      transforms.ToTensor(),
-        #      transforms.Normalize((0.5, 0.5, 0.5),
-        #                           (0.5, 0.5, 0.5))])
-
-        # Randomly change the brightness, contrast and saturation
-        jitter_transform = transforms.Compose(
-            [transforms.ColorJitter(),
-             transforms.ToTensor(),
-             transforms.Normalize((0.5, 0.5, 0.5),
-                                  (0.5, 0.5, 0.5))])
-
-        train_dataset = torch.utils.data.ConcatDataset(
-            (Mit67Dataset(os.path.join(data_path, 'train'), transform=transform),
-             Mit67Dataset(os.path.join(data_path, 'train'), transform=rotate_transform),
-             Mit67Dataset(os.path.join(data_path, 'train'), transform=flip_transform),
-             # Mit67Dataset(os.path.join(data_path, 'train'), transform=erase_transform),
-             Mit67Dataset(os.path.join(data_path, 'train'), transform=jitter_transform),
-             ))
-    else:
-        train_dataset = Mit67Dataset(os.path.join(data_path, 'train'), transform=transform)
+    train_dataset = Mit67Dataset(os.path.join(data_path, 'train'), transform=transform)
 
     valid_dataset = Mit67Dataset(os.path.join(data_path, 'valid'), transform=transform)
-    # test_dataset = Mit67Dataset(os.path.join(data_path, 'test'), transform=transform)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False)
-    # test accuracy shouldn't be here, better run in evaluate once we have selected the model
-    # test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     logging.info('===> Building model')
     logging.info(args)
@@ -165,14 +147,6 @@ def main():
 
     logging.info('===> Training')
     train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging)
-
-    # TODO: this shouldn't be here, only eval final model
-
-    #logging.info('==> Test')
-    #test(args, test_loader, model, device, logging)
-
-    logging.info('==> Validation')
-    logging.info(prettify_eval(evaluate(valid_loader, model, device)))
 
 
 if __name__ == '__main__':
