@@ -29,6 +29,36 @@ python src/cnn/preprocess.py
 
 ```
 
+Creating experiment:
+
+```
+python src/cnn/create_experiment.py experiment_name [options]
+
+```
+```
+options:
+      '--arch', type=str, help='Architecture', default='BaseCNN'
+      '--data', type=str, help='Dataset', default='256x256-split'
+      '--epochs', type=int, help='Number of epochs', default=3
+      '--lr', type=float, help='Learning Rate', default=0.001
+      '--momentum', type=float, help='Momentum', default=0.9
+      '--no-cuda', action='store_true', default=False, help='disables CUDA training'
+      '--augment', action='store_true', default=True, help='enables data augmentation'
+      '--optimizer', type=str, help='Optimizer', default='SGD'
+      '--batch-size', type=int, help='Mini-batch size', default=2
+      '--criterion', type=str, help='Criterion', default='cross-entropy'
+      '--early-stop', action='store_true', help='Early stop in validation set with no patience'
+```
+
+
+Running experiment on cluster:
+
+```
+run_experiment.sh experiments/experiment_folder/ debug|main
+
+```
+
+
 Notes:
 
 ```
