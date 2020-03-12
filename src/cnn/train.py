@@ -1,4 +1,5 @@
 import torch
+from torchsummary import summary
 
 import argparse
 import os
@@ -132,6 +133,8 @@ def main():
         model = AlexNet()
     elif args.arch == 'FiveLayerCNN':
         model = FiveLayerCNN()
+    elif args.arch == 'AlbertCNN':
+        model = AlbertCNN()
     elif args.arch == 'PyramidCNN':
         model = PyramidCNN(args)
     else:
