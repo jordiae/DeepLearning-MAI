@@ -22,7 +22,7 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
     for epoch in range(args.epochs):
         # train step (full epoch)
         logging.info(f'epoch {epoch+1}')
-        loss_epoch = 0.0
+        loss_train = 0.0
         total = 0
         correct = 0
         for idx, data in enumerate(train_loader):
@@ -37,9 +37,9 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-            loss_epoch += loss.item()
+            loss_train += loss.item()
         accuracy = 100 * correct / total
-        logging.info(f'train: avg_loss = {loss_epoch/total_len:.2f} | accuracy = {accuracy:.2f}')
+        logging.info(f'train: avg_loss = {loss_train/total:.2f} | accuracy = {accuracy:.2f}')
 
         # valid step
         correct = 0
