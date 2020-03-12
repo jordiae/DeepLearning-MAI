@@ -34,10 +34,10 @@ EXECUTION_DIR=/home/nct01/$USER/$EXPERIMENT_FOLDER
 
 if [ $MODE == "debug" ]
 then
-  $SSH $EXECUTION_ADDRESS "cd $EXECUTION_DIR/; export PYTHONPATH=\"${PYTHONPATH}:/home/nct01/$USER/src/\"; ./debug_launcher.sh"
+  $SSH $EXECUTION_ADDRESS "cd $EXECUTION_DIR/; export PYTHONPATH=\"${PYTHONPATH}:/home/nct01/$USER/src/\"; sbatch debug_launcher.sh"
 elif [ $MODE == "main" ]
 then
-  $SSH $EXECUTION_ADDRESS "cd $EXECUTION_DIR/; export PYTHONPATH=\"${PYTHONPATH}:/home/nct01/$USER/src/\"; ./main_launcher.sh"
+  $SSH $EXECUTION_ADDRESS "cd $EXECUTION_DIR/; export PYTHONPATH=\"${PYTHONPATH}:/home/nct01/$USER/src/\"; sbatch main_launcher.sh"
 else
   echo "execution mode not valid"
   exit 1
