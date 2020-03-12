@@ -1,4 +1,5 @@
 import torch
+from torchsummary import summary
 
 import argparse
 import os
@@ -14,7 +15,6 @@ from cnn.models import *
 
 
 def train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging):
-    logging.info(args)
     model.train()
     previous_valid_accuracy = 0.0
     for epoch in range(args.epochs):
@@ -60,15 +60,15 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
 def main():
     # Settings
     parser = argparse.ArgumentParser(description='Train a CNN for mit67')
-    parser.add_argument('--arch', type=str, help='Architecture', default='BaseCNN')
+    parser.add_argument('--arch', type=str, help='Architecture', default='AlbertCNN')
     parser.add_argument('--data', type=str, help='Dataset', default='256x256-split')
-    parser.add_argument('--epochs', type=int, help='Number of epochs', default=3)
+    parser.add_argument('--epochs', type=int, help='Number of epochs', default=100)
     parser.add_argument('--lr', type=float, help='Learning Rate', default=0.001)
     parser.add_argument('--momentum', type=float, help='Momentum', default=0.9)
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--augment', action='store_true', default=True, help='enables data augmentation')
     parser.add_argument('--optimizer', type=str, help='Optimizer', default='SGD')
-    parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=2)
+    parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=256)
     parser.add_argument('--criterion', type=str, help='Criterion', default='cross-entropy')
     parser.add_argument('--early-stop', action='store_true', default=True,
                         help='Early stop in validation set with no patience')
@@ -77,7 +77,7 @@ def main():
     args = parser.parse_args()
 
     LOG_PATH = 'train.log'
-    logging.basicConfig(filename=LOG_PATH, level=logging.INFO)
+    logging.basicConfig(filename=LOG_PATH, level=logging.INFO, filemode='w')
     logging.getLogger('').addHandler(logging.StreamHandler())
 
     logging.info('===> Loading datasets')
@@ -143,6 +143,8 @@ def main():
         model = AlexNet()
     elif args.arch == 'FiveLayerCNN':
         model = FiveLayerCNN()
+    elif args.arch == 'AlbertCNN':
+        model = AlbertCNN()
     else:
         raise NotImplementedError()
 
