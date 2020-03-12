@@ -1,2 +1,2 @@
 #!/bin/bash
-    python ../../src/cnn/train.py 
+python ../../src/cnn/train.py
