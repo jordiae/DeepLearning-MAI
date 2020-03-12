@@ -39,7 +39,7 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
             optimizer.step()
             loss_train += loss.item()
         accuracy = 100 * correct / total
-        logging.info(f'train: avg_loss = {loss_train/total:.2f} | accuracy = {accuracy:.2f}')
+        logging.info(f'train: avg_loss = {loss_train/total:.5f} | accuracy = {accuracy:.2f}')
 
         # valid step
         correct = 0
@@ -55,15 +55,15 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
         accuracy = 100 * correct/total
-        logging.info(f'valid: avg_loss = {loss_val/total:.2f} | accuracy = {accuracy:.2f}')
+        logging.info(f'valid: avg_loss = {loss_val/total:.5f} | accuracy = {accuracy:.2f}')
 
         torch.save(model.state_dict(), 'checkpoint_last.pt')
         if accuracy > best_valid_accuracy:
             best_valid_accuracy = accuracy
             torch.save(model.state_dict(), 'checkpoint_best.pt')
-            logging.info(f'best valid loss: {accuracy:.2f}')
+            logging.info(f'best valid accuracy: {accuracy:.2f}')
         else:
-            logging.info(f'best valid loss: {best_valid_accuracy:.2f}')
+            logging.info(f'best valid accuracy: {best_valid_accuracy:.2f}')
             if args.early_stop:
                 break
 
