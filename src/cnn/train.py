@@ -23,22 +23,23 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
         # train step (full epoch)
         logging.info(f'epoch {epoch+1}')
         loss_epoch = 0.0
-        total_len = len(train_loader)
+        total = 0
         correct = 0
         for idx, data in enumerate(train_loader):
-            if idx % total_len == int(total_len*0.1):
-                logging.info(f'{idx}/{total_len}')
+            if idx+1 % 10 == 0:
+                logging.info(f'{idx}/{len(train_loader)} batches')
             inputs, labels = data[0].to(device), data[1].to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
             _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
             correct += (predicted == labels).sum().item()
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
             loss_epoch += loss.item()
-        accuracy = 100 * correct / total_len
-        logging.info(f'train: avg_loss = {loss_epoch/total_len} | accuracy = {accuracy}')
+        accuracy = 100 * correct / total
+        logging.info(f'train: avg_loss = {loss_epoch/total_len:.2f} | accuracy = {accuracy:.2f}')
 
         # valid step
         correct = 0
@@ -54,15 +55,15 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
         accuracy = 100 * correct/total
-        logging.info(f'valid: avg_loss = {loss_val/total} | accuracy = {accuracy}')
+        logging.info(f'valid: avg_loss = {loss_val/total:.2f} | accuracy = {accuracy:.2f}')
 
         torch.save(model.state_dict(), 'checkpoint_last.pt')
         if accuracy > best_valid_accuracy:
             best_valid_accuracy = accuracy
             torch.save(model.state_dict(), 'checkpoint_best.pt')
-            logging.info(f'best valid loss: {accuracy}')
+            logging.info(f'best valid loss: {accuracy:.2f}')
         else:
-            logging.info(f'best valid loss: {best_valid_accuracy}')
+            logging.info(f'best valid loss: {best_valid_accuracy:.2f}')
             if args.early_stop:
                 break
 
