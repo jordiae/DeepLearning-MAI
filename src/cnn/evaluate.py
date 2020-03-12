@@ -7,6 +7,7 @@ import importlib
 from torchvision import transforms
 import os
 from cnn.dataset import Mit67Dataset
+import json
 
 
 def prettify_eval(accuracy, correct, avg_loss, class_report, n_instances):
@@ -47,7 +48,15 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=2)
     args = parser.parse_args()
     arch = importlib.import_module(args.arch)
-    model = arch()
+
+    parser_train = argparse.ArgumentParser()
+    train_args = parser_train.parse_args()
+    with open(os.path.join(args.model, 'args.json'), 'r') as f:
+        train_args.__dict__ = json.load(f)
+    if args.arch == 'PyramidCNN':
+        model = arch(train_args)
+    else:
+        model = arch()
     model.load_state_dict(torch.load(args.model))
     transform = transforms.Compose(
         [transforms.ToTensor(),

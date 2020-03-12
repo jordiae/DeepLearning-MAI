@@ -1,5 +1,5 @@
 import torch
-from torchsummary import summary
+#  from torchsummary import summary
 
 import argparse
 import os
@@ -12,9 +12,12 @@ from torchvision import transforms
 from cnn.evaluate import evaluate, prettify_eval
 from cnn.dataset import Mit67Dataset
 from cnn.models import *
+import json
 
 
 def train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging):
+    with open('args.json', 'w') as f:
+        json.dump(args.__dict__, f, indent=2)
     logging.info(args)
     logging.info(model)
     model.train()
