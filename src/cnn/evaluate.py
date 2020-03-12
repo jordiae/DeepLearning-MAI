@@ -28,7 +28,7 @@ def evaluate(data_loader, model, device):
             pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
             y_output.append(pred)
-            y_ground_truth.append(correct)
+            y_ground_truth.append(target)
 
         avg_loss /= len(data_loader.dataset)
     accuracy = 100. * correct / len(data_loader.dataset)
