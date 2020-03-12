@@ -26,7 +26,7 @@ class PyramidCNN(nn.Module):
             else:
                 channels_out = channels_in*2
             for j in range(0, args.conv_layers):
-                conv = nn.Conv2d(channels_in, channels_in*2, self.kernel_size, stride=self.stride, padding=self.padding)
+                conv = nn.Conv2d(channels_in, channels_out, self.kernel_size, stride=self.stride, padding=self.padding)
                 if self.batch_norm:
                     self.conv_layers.append(nn.ModuleList([conv, nn.BatchNorm2d(channels_out)]))
                 else:
