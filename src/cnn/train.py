@@ -3,16 +3,14 @@ import torch
 import argparse
 import os
 import logging
-import time
 
 import torch.nn as nn
 import torch.optim as optim
-import torchvision
 from torchvision import transforms
 
 from cnn.evaluate import evaluate, prettify_eval
-from cnn.models import *
 from cnn.dataset import Mit67Dataset
+from cnn.models import *
 
 
 def train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging):
@@ -78,14 +76,12 @@ def main():
     # TODO: parameterize data augmentation...
     args = parser.parse_args()
 
-    time_str = time.strftime("%Y%m%d-%H%M%S")
-    experiment_name = args.arch.lower() + time_str
-    LOG_PATH = os.path.join('..', 'experiments', 'cnn', experiment_name + '.log')
+    LOG_PATH = 'train.log'
     logging.basicConfig(filename=LOG_PATH, level=logging.INFO)
     logging.getLogger('').addHandler(logging.StreamHandler())
 
     logging.info('===> Loading datasets')
-    data_path = os.path.join('..', 'data', 'mit67', args.data)
+    data_path = os.path.join('..', '..', 'data', 'mit67', args.data)
 
     transform = transforms.Compose(
         [transforms.ToTensor(),
