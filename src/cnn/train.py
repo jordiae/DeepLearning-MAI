@@ -80,9 +80,16 @@ def main():
     parser.add_argument('--augment', action='store_true', default=True, help='enables data augmentation')
     parser.add_argument('--optimizer', type=str, help='Optimizer', default='SGD')
     parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=128)
-    parser.add_argument('--criterion', type=str, help='Criterion', default='cross-entropy')
+    parser.add_argument('--criterion', type=str, help='Criterion', default='cross-entropy')  # TODO: label smoothing?
     parser.add_argument('--early-stop', action='store_true', default=True,
                         help='Early stop in validation set with no patience')
+
+    parser.add_argument('--kernel_size', type=int, help='Kernel size', default=3)
+    parser.add_argument('--dropout', action='store_true', default=True, help='Enables dropout in FC layers (0.5)')
+    parser.add_argument('--batch-norm', action='store_true', default=True, help='Enables batch normalization')
+    parser.add_argument('--conv_layers', type=int, help='N convolutional layers in each block', default=2)
+    parser.add_argument('--conv_blocks', type=int, help='N convolutional blocks', default=5)
+    parser.add_argument('--fc-layers', type=int, help='N fully-connected layers', default=3)
 
     args = parser.parse_args()
 
@@ -102,7 +109,7 @@ def main():
         transform = transforms.Compose([
             transforms.RandomChoice([
                 transforms.RandomRotation(45),
-                transforms.RandomHorizontalFlip,
+                transforms.RandomHorizontalFlip(),
                 transforms.ColorJitter()  # Randomly change the brightness, contrast and saturation
 
             ]),
@@ -125,6 +132,8 @@ def main():
         model = AlexNet()
     elif args.arch == 'FiveLayerCNN':
         model = FiveLayerCNN()
+    elif args.arch == 'PyramidCNN':
+        model = PyramidCNN(args)
     else:
         raise NotImplementedError()
 
