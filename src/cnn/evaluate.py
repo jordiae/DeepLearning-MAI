@@ -10,8 +10,8 @@ from cnn.dataset import Mit67Dataset
 import json
 
 
-def prettify_eval(accuracy, correct, avg_loss, class_report, n_instances):
-    return '\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n{}\n'.format(
+def prettify_eval(set_, accuracy, correct, avg_loss, class_report, n_instances):
+    return '\n' + set_ + ' set average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n{}\n'.format(
         avg_loss, correct, n_instances, accuracy, class_report)
 
 
