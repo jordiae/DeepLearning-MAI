@@ -31,11 +31,12 @@ class PyramidCNN(nn.Module):
                     self.conv_layers.append(nn.ModuleList([conv, nn.BatchNorm2d(channels_out)]))
                 else:
                     self.conv_layers.append(conv)
-            channels_in = channels_out
+                channels_in = channels_out
 
         self.fc_layers = nn.ModuleList([])
         # square image, so same dimensions
-        dims_in = (self.input_size - self.kernel_size + 2*self.padding)*self.stride + 1
+        dims = (self.input_size - self.kernel_size + 2*self.padding)*self.stride + 1
+        dims_in = ((dims//2)**2)*channels_out
         self.dims_in_fc = dims_in
         for i in range(0, args.fc_layers-1):
             dims_out = dims_in  # so far we keep it constant, but we could experiment with it
@@ -51,7 +52,10 @@ class PyramidCNN(nn.Module):
         for conv_layer in self.conv_layers:
             if self.batch_norm:
                 conv, batch_norm = conv_layer
-                x = F.relu(batch_norm(conv(x)))
+                x = conv(x)
+                x = batch_norm(x)
+                x = F.relu(x)
+                #x = F.relu(batch_norm(conv(x)))
             else:
                 x = F.relu(conv_layer(x))
             x = self.pool(x)
