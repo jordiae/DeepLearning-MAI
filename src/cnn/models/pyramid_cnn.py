@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
+import torch
 
 
 class PyramidCNN(nn.Module):
@@ -18,28 +19,36 @@ class PyramidCNN(nn.Module):
         self.stride = 1
         self.padding = self.kernel_size//2
         self.channels_in = 3
-        self.channels_first_in = 32
+        self.channels_first_in = 16
+        self.n_conv_layers = args.conv_layers
+
         channels_in = self.channels_in
+        dims = self.input_size**2
         for i in range(0, args.conv_blocks):
             if i == 0:
                 channels_out = self.channels_first_in
             else:
                 channels_out = channels_in*2
             for j in range(0, args.conv_layers):
+                dims = ((dims - self.kernel_size + 2 * self.padding) * self.stride + 1)//2
                 conv = nn.Conv2d(channels_in, channels_out, self.kernel_size, stride=self.stride, padding=self.padding)
                 if self.batch_norm:
                     self.conv_layers.append(nn.ModuleList([conv, nn.BatchNorm2d(channels_out)]))
                 else:
                     self.conv_layers.append(conv)
                 channels_in = channels_out
-
+        self.pool_channels = nn.MaxPool2d(dims, dims)
         self.fc_layers = nn.ModuleList([])
         # square image, so same dimensions
-        dims = (self.input_size - self.kernel_size + 2*self.padding)*self.stride + 1
-        dims_in = ((dims//2)**2)*channels_out
+        #dims = (self.input_size - self.kernel_size + 2*self.padding)*self.stride + 1
+        #dims_in = ((dims//2)**2) * channels_out
+        #dims_in = dims * channels_out
+        #self.dims_in_fc = dims_in#//channels_out
+        #self.conv1x1 = nn.Conv2d(dims_in, 1, 1)
+        dims_in = channels_out
         self.dims_in_fc = dims_in
         for i in range(0, args.fc_layers-1):
-            dims_out = dims_in  # so far we keep it constant, but we could experiment with it
+            dims_out = self.dims_in_fc //2  #dims_in//4
             fc = nn.Linear(dims_in, dims_out)
             if self.batch_norm:
                 self.fc_layers.append(nn.ModuleList([fc, nn.BatchNorm1d(dims_out)]))
@@ -49,7 +58,7 @@ class PyramidCNN(nn.Module):
         self.fc_layers.append(nn.Linear(dims_in, self.n_classes))
 
     def forward(self, x):
-        for conv_layer in self.conv_layers:
+        for idx, conv_layer in enumerate(self.conv_layers):
             if self.batch_norm:
                 conv, batch_norm = conv_layer
                 x = conv(x)
@@ -58,7 +67,10 @@ class PyramidCNN(nn.Module):
                 #x = F.relu(batch_norm(conv(x)))
             else:
                 x = F.relu(conv_layer(x))
-            x = self.pool(x)
+            if idx % self.n_conv_layers == 0:
+                x = self.pool(x)
+        #x = self.conv1x1(x)
+        x = torch.squeeze(self.pool_channels(x))
         x = x.view(-1, self.dims_in_fc)
         for fc_layer in self.fc_layers[:-1]:
             if self.batch_norm:
