@@ -28,8 +28,8 @@ def evaluate(data_loader, model, device):
             avg_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
             pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
-            y_output.append(pred)
-            y_ground_truth.append(target)
+            y_output += torch.squeeze(pred).tolist()
+            y_ground_truth += torch.squeeze(target).tolist()
 
         avg_loss /= len(data_loader.dataset)
     accuracy = 100. * correct / len(data_loader.dataset)

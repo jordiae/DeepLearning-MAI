@@ -23,20 +23,21 @@ class PyramidCNN(nn.Module):
         self.n_conv_layers = args.conv_layers
 
         channels_in = self.channels_in
-        dims = self.input_size**2
+        dims = self.input_size
         for i in range(0, args.conv_blocks):
             if i == 0:
                 channels_out = self.channels_first_in
             else:
                 channels_out = channels_in*2
             for j in range(0, args.conv_layers):
-                dims = ((dims - self.kernel_size + 2 * self.padding) * self.stride + 1)//2
+                dims = ((dims - self.kernel_size + 2 * self.padding) * self.stride + 1)
                 conv = nn.Conv2d(channels_in, channels_out, self.kernel_size, stride=self.stride, padding=self.padding)
                 if self.batch_norm:
                     self.conv_layers.append(nn.ModuleList([conv, nn.BatchNorm2d(channels_out)]))
                 else:
                     self.conv_layers.append(conv)
                 channels_in = channels_out
+            dims //= 2
         self.pool_channels = nn.MaxPool2d(dims, dims)
         self.fc_layers = nn.ModuleList([])
         # square image, so same dimensions

@@ -70,7 +70,8 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
             if args.early_stop:
                 break
 
-    # logging.info(prettify_eval(evaluate(valid_loader, model, device)))
+    eval_res = evaluate(valid_loader, model, device)
+    logging.info(prettify_eval(*eval_res))
 
 
 def main():
@@ -88,6 +89,7 @@ def main():
     parser.add_argument('--criterion', type=str, help='Criterion', default='cross-entropy')  # TODO: label smoothing?
     parser.add_argument('--early-stop', action='store_true', default=True,
                         help='Early stop in validation set with no patience')
+    parser.add_argument('--weight-decay', type=float, help='Weight decay', default=0.001)
 
     parser.add_argument('--kernel_size', type=int, help='Kernel size', default=3)
     parser.add_argument('--dropout', action='store_true', default=True, help='Enables dropout in FC layers (0.5)')
@@ -145,9 +147,9 @@ def main():
         raise NotImplementedError()
 
     if args.optimizer == 'SGD':
-        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     elif args.optimizer == 'Adam':
-        optimizer = optim.Adam(model.parameters(), lr=args.lr)
+        optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     else:
         logging.error("Optimizer not implemented")
         raise NotImplementedError()
