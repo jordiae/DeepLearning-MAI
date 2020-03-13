@@ -32,8 +32,8 @@ python {relative_train_path} {parameters}'''
 
 def create_experiment(name, parameters):
     train_script = create_train_script(parameters)
-    slurm_debug_script = create_slurm_script(name, 'debug', '00:30:00')
-    slurm_main_script = create_slurm_script(name, 'training', '02:00:00')
+    slurm_debug_script = create_slurm_script(name, 'debug', '00:15:00')
+    slurm_main_script = create_slurm_script(name, 'training', '12:00:00')
     timestamp = time.strftime("%Y-%m-%d-%H%M")
     exp_dir = os.path.join('..', '..', 'experiments', f'{name}-{timestamp}')
     os.makedirs(exp_dir)

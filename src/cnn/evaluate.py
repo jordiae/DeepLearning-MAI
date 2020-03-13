@@ -44,7 +44,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, help='Path to model checkpoint')
     parser.add_argument('--data', type=str, help='Dataset', default='256x256-split')
     parser.add_argument('--subset', type=str, help='Data subset', default='test')
-    parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
+    parser.add_argument('--no-cuda', action='store_true', help='disables CUDA training')
     parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=2)
     args = parser.parse_args()
     arch = importlib.import_module(args.arch)
