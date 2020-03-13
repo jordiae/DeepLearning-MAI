@@ -29,7 +29,7 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
         total = 0
         correct = 0
         for idx, data in enumerate(train_loader):
-            logging.info(f'{idx}/{len(train_loader)} batches')
+            logging.info(f'{idx+1}/{len(train_loader)} batches')
             inputs, labels = data[0].to(device), data[1].to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
