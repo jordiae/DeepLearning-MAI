@@ -70,7 +70,7 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
             if args.early_stop:
                 break
 
-    logging.info(prettify_eval(evaluate(valid_loader, model, device)))
+    # logging.info(prettify_eval(evaluate(valid_loader, model, device)))
 
 
 def main():
@@ -92,8 +92,8 @@ def main():
     parser.add_argument('--kernel_size', type=int, help='Kernel size', default=3)
     parser.add_argument('--dropout', action='store_true', default=True, help='Enables dropout in FC layers (0.5)')
     parser.add_argument('--batch-norm', action='store_true', default=True, help='Enables batch normalization')
-    parser.add_argument('--conv_layers', type=int, help='N convolutional layers in each block', default=2)
-    parser.add_argument('--conv_blocks', type=int, help='N convolutional blocks', default=5)
+    parser.add_argument('--conv-layers', type=int, help='N convolutional layers in each block', default=2)
+    parser.add_argument('--conv-blocks', type=int, help='N convolutional blocks', default=9)
     parser.add_argument('--fc-layers', type=int, help='N fully-connected layers', default=3)
 
     args = parser.parse_args()
