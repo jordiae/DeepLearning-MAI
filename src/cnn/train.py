@@ -24,7 +24,7 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
     best_valid_accuracy = 0.0
     for epoch in range(args.epochs):
         # train step (full epoch)
-        logging.info(f'epoch {epoch+1}')
+        logging.info(f'Epoch {epoch+1} |')
         loss_train = 0.0
         total = 0
         correct = 0
