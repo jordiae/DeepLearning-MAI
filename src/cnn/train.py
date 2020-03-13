@@ -67,7 +67,7 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
             logging.info(f'best valid accuracy: {accuracy:.2f}')
         else:
             logging.info(f'best valid accuracy: {best_valid_accuracy:.2f}')
-            if args.early_stop:
+            if not args.no_early_stop:
                 break
 
     logging.info(prettify_eval(evaluate(valid_loader, model, device)))
@@ -76,17 +76,17 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
 def main():
     # Settings
     parser = argparse.ArgumentParser(description='Train a CNN for mit67')
-    parser.add_argument('--arch', type=str, help='Architecture', default='BaseCNN')
+    parser.add_argument('--arch', type=str, help='Architecture', default='PyramidCNN')
     parser.add_argument('--data', type=str, help='Dataset', default='256x256-split')
     parser.add_argument('--epochs', type=int, help='Number of epochs', default=100)
     parser.add_argument('--lr', type=float, help='Learning Rate', default=0.001)
     parser.add_argument('--momentum', type=float, help='Momentum', default=0.9)
-    parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
-    parser.add_argument('--augment', action='store_true', default=True, help='enables data augmentation')
-    parser.add_argument('--optimizer', type=str, help='Optimizer', default='SGD')
+    parser.add_argument('--no-cuda', action='store_true', help='disables CUDA training')
+    parser.add_argument('--no-augment', action='store_true', help='enables data augmentation')
+    parser.add_argument('--optimizer', type=str, help='Optimizer', default='Adam')
     parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=128)
     parser.add_argument('--criterion', type=str, help='Criterion', default='cross-entropy')  # TODO: label smoothing?
-    parser.add_argument('--early-stop', action='store_true', default=True,
+    parser.add_argument('--no-early-stop', action='store_true',
                         help='Early stop in validation set with no patience')
 
     parser.add_argument('--kernel_size', type=int, help='Kernel size', default=3)
@@ -109,7 +109,7 @@ def main():
         [transforms.ToTensor(),  # scale to [0,1] float tensor
          transforms.Normalize((0.5, 0.5, 0.5),
                               (0.5, 0.5, 0.5))])
-    if args.augment:
+    if not args.no_augment:
         #  to randomly pick and apply the transformations
         transform = transforms.Compose([
             transforms.RandomChoice([
