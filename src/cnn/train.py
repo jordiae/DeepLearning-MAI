@@ -13,15 +13,18 @@ from cnn.evaluate import evaluate, prettify_eval
 from cnn.dataset import Mit67Dataset
 from cnn.models import *
 import json
-
+from torch.utils.tensorboard import SummaryWriter
+import importlib
 
 def train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging):
+    writer = SummaryWriter()
     with open('args.json', 'w') as f:
         json.dump(args.__dict__, f, indent=2)
     logging.info(args)
     logging.info(model)
     model.train()
     best_valid_accuracy = 0.0
+    epochs_without_improvement = 0
     for epoch in range(args.epochs):
         # train step (full epoch)
         model.train()
@@ -44,6 +47,8 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
             loss_train += loss.item()
         accuracy = 100 * correct / total
         logging.info(f'train: avg_loss = {loss_train/total:.5f} | accuracy = {accuracy:.2f}')
+        writer.add_scalar('Avg-loss/train', loss_train/total, epoch+1)
+        writer.add_scalar('Accuracy/train', accuracy, epoch + 1)
 
         # valid step
         correct = 0
@@ -61,17 +66,27 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
                 correct += (predicted == labels).sum().item()
         accuracy = 100 * correct/total
         logging.info(f'valid: avg_loss = {loss_val/total:.5f} | accuracy = {accuracy:.2f}')
+        writer.add_scalar('Avg-loss/valid', loss_val / total, epoch + 1)
+        writer.add_scalar('Accuracy/valid', accuracy, epoch + 1)
 
         torch.save(model.state_dict(), 'checkpoint_last.pt')
         if accuracy > best_valid_accuracy:
+            epochs_without_improvement = 0
             best_valid_accuracy = accuracy
             torch.save(model.state_dict(), 'checkpoint_best.pt')
             logging.info(f'best valid accuracy: {accuracy:.2f}')
         else:
+            epochs_without_improvement += 1
             logging.info(f'best valid accuracy: {best_valid_accuracy:.2f}')
-            if not args.no_early_stop:
+            if args.early_stop != -1 and epochs_without_improvement == args.early_stop:
                 break
-
+        logging.info(f'{epochs_without_improvement} epochs without improvement in validation set')
+    arch = importlib.import_module(args.arch)
+    if args.arch == 'PyramidCNN':
+        model = arch(args)
+    else:
+        model = arch()
+    model.load_state_dict(torch.load(args.model))
     eval_res = evaluate(valid_loader, model, device)
     logging.info(prettify_eval(*eval_res))
 
@@ -89,8 +104,8 @@ def main():
     parser.add_argument('--optimizer', type=str, help='Optimizer', default='Adam')
     parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=128)
     parser.add_argument('--criterion', type=str, help='Criterion', default='cross-entropy')  # TODO: label smoothing?
-    parser.add_argument('--no-early-stop', action='store_true',
-                        help='Early stop in validation set with no patience')
+    parser.add_argument('--early-stop', type=int,
+                        help='Patience in early stop in validation set (-1 -> no early stop)')
     parser.add_argument('--weight-decay', type=float, help='Weight decay', default=0.001)
 
     parser.add_argument('--kernel_size', type=int, help='Kernel size', default=3)
@@ -99,6 +114,7 @@ def main():
     parser.add_argument('--conv-layers', type=int, help='N convolutional layers in each block', default=2)
     parser.add_argument('--conv-blocks', type=int, help='N convolutional blocks', default=7)
     parser.add_argument('--fc-layers', type=int, help='N fully-connected layers', default=3)
+    parser.add_argument('--initial-channels', type=int, help='Channels out in first convolutional layer', default=16)
 
     args = parser.parse_args()
 

@@ -19,7 +19,7 @@ class PyramidCNN(nn.Module):
         self.stride = 1
         self.padding = self.kernel_size//2
         self.channels_in = 3
-        self.channels_first_in = 16
+        self.channels_first_in = args.initial_channels
         self.n_conv_layers = args.conv_layers
 
         channels_in = self.channels_in
