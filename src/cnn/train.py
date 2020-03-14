@@ -24,6 +24,7 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
     best_valid_accuracy = 0.0
     for epoch in range(args.epochs):
         # train step (full epoch)
+        model.train()
         logging.info(f'Epoch {epoch+1} |')
         loss_train = 0.0
         total = 0
@@ -48,6 +49,7 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
         correct = 0
         total = 0
         loss_val = 0
+        model.eval()
         with torch.no_grad():
             for data in valid_loader:
                 images, labels = data[0].to(device), data[1].to(device)
