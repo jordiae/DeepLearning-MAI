@@ -1,20 +1,15 @@
 import torch
-#  from torchsummary import summary
-
 import argparse
 import os
 import logging
-
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import transforms
-
 from cnn.evaluate import evaluate, prettify_eval
 from cnn.dataset import Mit67Dataset
-from cnn.models import *
 import json
 from torch.utils.tensorboard import SummaryWriter
-import importlib
+from cnn.utils import load_arch
 
 
 def train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging):
@@ -82,14 +77,11 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
             if args.early_stop != -1 and epochs_without_improvement == args.early_stop:
                 break
         logging.info(f'{epochs_without_improvement} epochs without improvement in validation set')
-    arch = importlib.import_module(args.arch)
-    if args.arch == 'PyramidCNN':
-        model = arch(args)
-    else:
-        model = arch()
+
+    model = load_arch(args)
     model.load_state_dict(torch.load(args.model))
     eval_res = evaluate(valid_loader, model, device)
-    logging.info(prettify_eval(*eval_res))
+    logging.info(prettify_eval('train', *eval_res))
 
 
 def main():
@@ -152,18 +144,7 @@ def main():
 
     logging.info('===> Building model')
     logging.info(args)
-    if args.arch == 'BaseCNN':
-        model = BaseCNN()
-    elif args.arch == 'AlexNet':
-        model = AlexNet()
-    elif args.arch == 'FiveLayerCNN':
-        model = FiveLayerCNN()
-    elif args.arch == 'AlbertCNN':
-        model = AlbertCNN()
-    elif args.arch == 'PyramidCNN':
-        model = PyramidCNN(args)
-    else:
-        raise NotImplementedError()
+    model = load_arch(args)
 
     if args.optimizer == 'SGD':
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)

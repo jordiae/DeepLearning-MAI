@@ -2,12 +2,16 @@ import torch
 import torch.nn.functional as F
 from sklearn.metrics import classification_report
 import argparse
-from cnn.models import *
-import importlib
 from torchvision import transforms
 import os
 from cnn.dataset import Mit67Dataset
 import json
+from cnn.utils import load_arch
+import logging
+
+class ArgsStruct:
+    def __init__(self, **entries):
+        self.__dict__.update(entries)
 
 
 def prettify_eval(set_, accuracy, correct, avg_loss, class_report, n_instances):
@@ -25,8 +29,8 @@ def evaluate(data_loader, model, device):
         for data, target in data_loader:
             data, target = data.to(device), target.to(device)
             output = model(data)
-            avg_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
-            pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+            avg_loss += F.nll_loss(output, target, reduction='sum').item()  # sum batch loss
+            pred = output.argmax(dim=1, keepdim=True)  # index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
             y_output += torch.squeeze(pred).tolist()
             y_ground_truth += torch.squeeze(target).tolist()
@@ -41,30 +45,32 @@ if __name__ == '__main__':
     # TODO: test whether it works
     parser = argparse.ArgumentParser(description='Evaluate a CNN for mit67')
     parser.add_argument('--arch', type=str, help='Architecture')
-    parser.add_argument('--model', type=str, help='Path to model checkpoint')
+    parser.add_argument('--model-path', type=str, help='Path to model directory')
+    parser.add_argument('--checkpoint', type=str, default='checkpoint_best.pt',  help='Checkpoint name')
     parser.add_argument('--data', type=str, help='Dataset', default='256x256-split')
     parser.add_argument('--subset', type=str, help='Data subset', default='test')
     parser.add_argument('--no-cuda', action='store_true', help='disables CUDA training')
     parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=2)
     args = parser.parse_args()
-    arch = importlib.import_module(args.arch)
+    log_path = f'eval-{args.subset}.log'
+    logging.basicConfig(filename=log_path, level=logging.INFO)
+    logging.getLogger('').addHandler(logging.StreamHandler())
 
-    parser_train = argparse.ArgumentParser()
-    train_args = parser_train.parse_args()
-    with open(os.path.join(args.model, 'args.json'), 'r') as f:
-        train_args.__dict__ = json.load(f)
     if args.arch == 'PyramidCNN':
-        model = arch(train_args)
+        with open(os.path.join(args.model_path, 'args.json'), 'r') as f:
+                train_args = ArgsStruct(**json.load(f))
+        model = load_arch(train_args)
     else:
-        model = arch()
-    model.load_state_dict(torch.load(args.model))
+        model = load_arch(None)
+    model.load_state_dict(torch.load(os.path.join(args.model_path, args.checkpoint)))
     transform = transforms.Compose(
         [transforms.ToTensor(),
          transforms.Normalize((0.5, 0.5, 0.5),
                               (0.5, 0.5, 0.5))])
-    dataset = Mit67Dataset(os.path.join(args.data, args.subset), transform=transform)
+    dataset = Mit67Dataset(os.path.join('..', '..', 'data', 'mit67', args.data, args.subset), transform=transform)
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
     device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
     model.to(device)
-    evaluate(data_loader, model, device)
-    print(prettify_eval)
+    eval_res = evaluate(data_loader, model, device)
+    print()
+    logging.info(prettify_eval(args.subset, *eval_res))
