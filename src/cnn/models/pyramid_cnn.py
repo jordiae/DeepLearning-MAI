@@ -44,7 +44,7 @@ class PyramidCNN(nn.Module):
         dims_in = channels_out * 2  # because of concat of max and avg pooling along channels
         self.dims_in_fc = dims_in
         for i in range(0, args.fc_layers-1):
-            dims_out = self.dims_in_fc // 2
+            dims_out = dims_in // 2
             fc = nn.Linear(dims_in, dims_out)
             if self.batch_norm:
                 self.fc_layers.append(nn.ModuleList([fc, nn.BatchNorm1d(dims_out)]))
