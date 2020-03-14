@@ -105,7 +105,7 @@ def main():
     parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=128)
     parser.add_argument('--criterion', type=str, help='Criterion', default='cross-entropy')  # TODO: label smoothing?
     parser.add_argument('--early-stop', type=int,
-                        help='Patience in early stop in validation set (-1 -> no early stop)')
+                        help='Patience in early stop in validation set (-1 -> no early stop)', default=6)
     parser.add_argument('--weight-decay', type=float, help='Weight decay', default=0.001)
 
     parser.add_argument('--kernel_size', type=int, help='Kernel size', default=3)
