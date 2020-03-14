@@ -32,8 +32,8 @@ def create_train_bat(parameters):
 def create_train_script(parameters):
     relative_train_path = '/'.join(['..', '..', 'src', 'cnn', 'train.py'])
     script = '''#!/bin/bash
-src_path=$(realpath ../../src)
-export PYTHONPATH="$\{PYTHONPATH}:${src_path}'''
+src_path="$(realpath ../../src)"
+export PYTHONPATH="${PYTHONPATH}:${src_path}"'''
     script += f'\n python {relative_train_path} {parameters}'
     return script
 
