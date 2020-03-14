@@ -100,7 +100,7 @@ def main():
     parser.add_argument('--lr', type=float, help='Learning Rate', default=0.001)
     parser.add_argument('--momentum', type=float, help='Momentum', default=0.9)
     parser.add_argument('--no-cuda', action='store_true', help='disables CUDA training')
-    parser.add_argument('--no-augment', action='store_true', help='enables data augmentation')
+    parser.add_argument('--no-augment', action='store_true', help='disables data augmentation')
     parser.add_argument('--optimizer', type=str, help='Optimizer', default='Adam')
     parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=128)
     parser.add_argument('--criterion', type=str, help='Criterion', default='cross-entropy')  # TODO: label smoothing?
@@ -109,8 +109,8 @@ def main():
     parser.add_argument('--weight-decay', type=float, help='Weight decay', default=0.001)
 
     parser.add_argument('--kernel_size', type=int, help='Kernel size', default=3)
-    parser.add_argument('--dropout', action='store_true', default=True, help='Enables dropout in FC layers (0.5)')
-    parser.add_argument('--batch-norm', action='store_true', default=True, help='Enables batch normalization')
+    parser.add_argument('--no-dropout', action='store_true', help='disables dropout in FC layers (0.5)')
+    parser.add_argument('--no-batch-norm', action='store_true', help='disables batch normalization')
     parser.add_argument('--conv-layers', type=int, help='N convolutional layers in each block', default=2)
     parser.add_argument('--conv-blocks', type=int, help='N convolutional blocks', default=7)
     parser.add_argument('--fc-layers', type=int, help='N fully-connected layers', default=3)

@@ -9,9 +9,9 @@ class PyramidCNN(nn.Module):
         # channels in, channels out, kernel_size.
         # Defaults:  stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'
         self.kernel_size = args.kernel_size
-        self.dropout = args.dropout
+        self.dropout = not args.no_dropout
         self.dropout_ = nn.Dropout()
-        self.batch_norm = args.batch_norm
+        self.batch_norm = not args.no_batch_norm
         self.pool = nn.MaxPool2d(2, 2)
         self.conv_layers = nn.ModuleList([])
         self.n_classes = 67
