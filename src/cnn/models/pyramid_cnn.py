@@ -38,18 +38,13 @@ class PyramidCNN(nn.Module):
                     self.conv_layers.append(conv)
                 channels_in = channels_out
             dims //= 2
-        self.pool_channels = nn.MaxPool2d(dims, dims)
+        self.pool_channels_max = nn.MaxPool2d(dims, dims)
+        self.pool_channels_avg = nn.AvgPool2d(dims, dims)
         self.fc_layers = nn.ModuleList([])
-        # square image, so same dimensions
-        #dims = (self.input_size - self.kernel_size + 2*self.padding)*self.stride + 1
-        #dims_in = ((dims//2)**2) * channels_out
-        #dims_in = dims * channels_out
-        #self.dims_in_fc = dims_in#//channels_out
-        #self.conv1x1 = nn.Conv2d(dims_in, 1, 1)
-        dims_in = channels_out
+        dims_in = channels_out * 2  # because of concat of max and avg pooling along channels
         self.dims_in_fc = dims_in
         for i in range(0, args.fc_layers-1):
-            dims_out = self.dims_in_fc //2  #dims_in//4
+            dims_out = self.dims_in_fc // 2
             fc = nn.Linear(dims_in, dims_out)
             if self.batch_norm:
                 self.fc_layers.append(nn.ModuleList([fc, nn.BatchNorm1d(dims_out)]))
@@ -62,16 +57,12 @@ class PyramidCNN(nn.Module):
         for idx, conv_layer in enumerate(self.conv_layers):
             if self.batch_norm:
                 conv, batch_norm = conv_layer
-                x = conv(x)
-                x = batch_norm(x)
-                x = F.relu(x)
-                #x = F.relu(batch_norm(conv(x)))
+                x = F.relu(batch_norm(conv(x)))
             else:
                 x = F.relu(conv_layer(x))
             if idx % self.n_conv_layers == 0:
                 x = self.pool(x)
-        #x = self.conv1x1(x)
-        x = torch.squeeze(self.pool_channels(x))
+        x = torch.cat([torch.squeeze(self.pool_channels_max(x)), torch.squeeze(self.pool_channels_max(x))], 1)
         x = x.view(-1, self.dims_in_fc)
         for fc_layer in self.fc_layers[:-1]:
             if self.batch_norm:
