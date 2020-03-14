@@ -19,9 +19,9 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
     logging.info(args)
     logging.info(model)
     model.train()
-    best_valid_accuracy = resume_info.best_valid_accuracy
-    epochs_without_improvement = resume_info.epochs_without_improvement
-    for epoch in range(resume_info.epoch, args.epochs):
+    best_valid_accuracy = resume_info['best_valid_accuracy']
+    epochs_without_improvement = resume_info['epochs_without_improvement']
+    for epoch in range(resume_info['epoch'], args.epochs):
         # train step (full epoch)
         model.train()
         logging.info(f'Epoch {epoch+1} |')
