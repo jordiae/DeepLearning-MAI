@@ -9,6 +9,7 @@ import json
 from cnn.utils import load_arch
 import logging
 
+
 class ArgsStruct:
     def __init__(self, **entries):
         self.__dict__.update(entries)
@@ -72,5 +73,4 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
     model.to(device)
     eval_res = evaluate(data_loader, model, device)
-    print()
     logging.info(prettify_eval(args.subset, *eval_res))

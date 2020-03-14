@@ -79,7 +79,7 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
         logging.info(f'{epochs_without_improvement} epochs without improvement in validation set')
 
     model = load_arch(args)
-    model.load_state_dict(torch.load(args.model))
+    model.load_state_dict(torch.load('checkpoint_best.pt'))
     eval_res = evaluate(valid_loader, model, device)
     logging.info(prettify_eval('train', *eval_res))
 
