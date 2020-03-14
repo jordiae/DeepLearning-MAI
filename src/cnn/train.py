@@ -16,6 +16,7 @@ import json
 from torch.utils.tensorboard import SummaryWriter
 import importlib
 
+
 def train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging):
     writer = SummaryWriter()
     with open('args.json', 'w') as f:
