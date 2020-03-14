@@ -80,6 +80,7 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
 
     model = load_arch(args)
     model.load_state_dict(torch.load('checkpoint_best.pt'))
+    model.to(device)
     eval_res = evaluate(valid_loader, model, device)
     logging.info(prettify_eval('train', *eval_res))
 
