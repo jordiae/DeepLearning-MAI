@@ -12,11 +12,12 @@ class PyramidCNN(nn.Module):
         self.dropout = not args.no_dropout
         self.dropout_ = nn.Dropout()
         self.batch_norm = not args.no_batch_norm
-        self.pool = nn.MaxPool2d(2, 2)
+        self.pool = None if args.no_pool else nn.MaxPool2d(2, 2)
         self.conv_layers = nn.ModuleList([])
         self.n_classes = 67
         self.input_size = 256
         self.stride = 1
+        self.stride_end_block = 2
         self.padding = self.kernel_size//2
         self.channels_in = 3
         self.channels_first_in = args.initial_channels
@@ -31,7 +32,12 @@ class PyramidCNN(nn.Module):
                 channels_out = channels_in*2
             for j in range(0, args.conv_layers):
                 dims = ((dims - self.kernel_size + 2 * self.padding) * self.stride + 1)
-                conv = nn.Conv2d(channels_in, channels_out, self.kernel_size, stride=self.stride, padding=self.padding)
+                if j == args.conv_layers-1 and args.no_pool:
+                    conv = nn.Conv2d(channels_in, channels_out, self.kernel_size, stride=self.stride_end_block,
+                                     padding=self.padding)
+                else:
+                    conv = nn.Conv2d(channels_in, channels_out, self.kernel_size, stride=self.stride,
+                                     padding=self.padding)
                 if self.batch_norm:
                     self.conv_layers.append(nn.ModuleList([conv, nn.BatchNorm2d(channels_out)]))
                 else:
@@ -61,8 +67,9 @@ class PyramidCNN(nn.Module):
             else:
                 x = F.relu(conv_layer(x))
             if idx % self.n_conv_layers == 0:
-                x = self.pool(x)
-        x = torch.cat([torch.squeeze(self.pool_channels_max(x)), torch.squeeze(self.pool_channels_max(x))], 1)
+                if self.pool:
+                    x = self.pool(x)
+        x = torch.cat([torch.squeeze(self.pool_channels_max(x)), torch.squeeze(self.pool_channels_avg(x))], 1)
         x = x.view(-1, self.dims_in_fc)
         for fc_layer in self.fc_layers[:-1]:
             if self.batch_norm:

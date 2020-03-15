@@ -109,6 +109,7 @@ def main():
     parser.add_argument('--conv-blocks', type=int, help='N convolutional blocks', default=7)
     parser.add_argument('--fc-layers', type=int, help='N fully-connected layers', default=3)
     parser.add_argument('--initial-channels', type=int, help='Channels out in first convolutional layer', default=16)
+    parser.add_argument('--no-pool', action='store_true', help='Replace pooling by stride = 2')
 
     parser.add_argument('--crop', action='store_true', help='Crop images instead of resizing')
     parser.add_argument('--resize-crop-dimension', type=int, help='Dimension of the resize or crop', default=256)
