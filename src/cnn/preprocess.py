@@ -150,11 +150,11 @@ def preprocess(original_data_path, remove_bw=True, resize_data=False, new_size=N
 
 
 if __name__ == '__main__':
-    path = None
+    path = os.path.join('..', '..', 'data', 'mit67', 'not-resized')
     logging.info(date.today())
     original_data_path = os.path.join('..', '..', 'data', 'mit67', 'Images')
     remove_bw = True
-    resize_data = True
+    resize_data = False
     new_size = (256, 256)
     resized_path = os.path.join('..', '..', 'data', 'mit67', f'{new_size[0]}x{new_size[1]}')
     if resize_data:
