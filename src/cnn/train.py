@@ -10,6 +10,7 @@ from cnn.dataset import Mit67Dataset
 import json
 from torch.utils.tensorboard import SummaryWriter
 from cnn.utils import load_arch
+from cnn.utils import SmoothCrossEntropyLoss
 
 
 def train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging, resume_info):
@@ -97,7 +98,8 @@ def main():
     parser.add_argument('--no-augment', action='store_true', help='disables data augmentation')
     parser.add_argument('--optimizer', type=str, help='Optimizer', default='Adam')
     parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=128)
-    parser.add_argument('--criterion', type=str, help='Criterion', default='cross-entropy')  # TODO: label smoothing?
+    parser.add_argument('--criterion', type=str, help='Criterion', default='cross-entropy')
+    parser.add_argument('--smooth-criterion', type=float, help='Smoothness for label-smoothing', default=0.9)
     parser.add_argument('--early-stop', type=int,
                         help='Patience in early stop in validation set (-1 -> no early stop)', default=6)
     parser.add_argument('--weight-decay', type=float, help='Weight decay', default=0.001)
@@ -178,6 +180,8 @@ def main():
 
     if args.criterion == 'cross-entropy':
         criterion = nn.CrossEntropyLoss()
+    elif args.criterion == 'label-smooth':
+        criterion = SmoothCrossEntropyLoss(smoothing=args.smooth_criterion)
     else:
         logging.error("Criterion not implemented")
         raise NotImplementedError()
