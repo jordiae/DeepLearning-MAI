@@ -9,8 +9,8 @@ class PyramidCNN(nn.Module):
         # channels in, channels out, kernel_size.
         # Defaults:  stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'
         self.kernel_size = args.kernel_size
-        self.dropout = not args.no_dropout
-        self.dropout_ = nn.Dropout()
+        self.dropout = True if args.dropout > 0.0 else False
+        self.dropout_layer = nn.Dropout(args.dropout) if args.dropout > 0.0 else None
         self.batch_norm = not args.no_batch_norm
         self.pool = None if args.no_pool else nn.MaxPool2d(2, 2)
         self.conv_layers = nn.ModuleList([])
@@ -77,7 +77,7 @@ class PyramidCNN(nn.Module):
                 x = F.relu(batch_norm(fc(x)))
             else:
                 x = F.relu(fc_layer(x))
-            x = self.dropout_(x)
+            x = self.dropout_layer(x)
         x = self.fc_layers[-1](x)
         return x
         # softmax not required (done by cross-entropy criterion):
