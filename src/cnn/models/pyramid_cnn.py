@@ -31,12 +31,11 @@ class PyramidCNN(nn.Module):
             else:
                 channels_out = channels_in*2
             for j in range(0, args.conv_layers):
+                dims = ((dims - self.kernel_size + 2 * self.padding) * self.stride + 1)
                 if j == args.conv_layers-1 and args.no_pool:
-                    dims = ((dims - self.kernel_size + 2 * self.padding) * self.stride_end_block + 1)
                     conv = nn.Conv2d(channels_in, channels_out, self.kernel_size, stride=self.stride_end_block,
                                      padding=self.padding)
                 else:
-                    dims = ((dims - self.kernel_size + 2 * self.padding) * self.stride + 1)
                     conv = nn.Conv2d(channels_in, channels_out, self.kernel_size, stride=self.stride,
                                      padding=self.padding)
                 if self.batch_norm:
@@ -70,7 +69,7 @@ class PyramidCNN(nn.Module):
             if idx % self.n_conv_layers == 0:
                 if self.pool:
                     x = self.pool(x)
-        x = torch.cat([torch.squeeze(self.pool_channels_max(x)), torch.squeeze(self.pool_channels_max(x))], 1)
+        x = torch.cat([torch.squeeze(self.pool_channels_max(x)), torch.squeeze(self.pool_channels_avg(x))], 1)
         x = x.view(-1, self.dims_in_fc)
         for fc_layer in self.fc_layers[:-1]:
             if self.batch_norm:
