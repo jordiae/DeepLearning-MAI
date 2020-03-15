@@ -125,11 +125,17 @@ def main():
     if not args.no_augment:
         #  to randomly pick and apply the transformations
         transform = transforms.Compose([
+            transforms.RandomCrop(256,
+                                  pad_if_needed=True,
+                                  padding_mode='symmetric'),
+            transforms.RandomApply(
+                [transforms.RandomChoice([
+                    transforms.RandomAffine(0, shear=10),
+                    transforms.RandomRotation(25),
+                    ])], p=0.2),
             transforms.RandomChoice([
-                transforms.RandomRotation(45),
                 transforms.RandomHorizontalFlip(),
                 transforms.ColorJitter()  # Randomly change the brightness, contrast and saturation
-
             ]),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5),
