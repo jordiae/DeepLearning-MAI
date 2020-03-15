@@ -21,8 +21,11 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
     logging.info(args)
     logging.info(model)
     model.train()
-    best_valid_metric = resume_info['best_valid_metric']
-    epochs_without_improvement = resume_info['epochs_without_improvement']
+    if resume_info['mode'] == 'autoencoder' and not args.autoencoder:
+        logging.info('Starting training from pre-trained encoder')
+    else:
+        best_valid_metric = resume_info['best_valid_metric']
+        epochs_without_improvement = resume_info['epochs_without_improvement']
     for epoch in range(resume_info['epoch'], args.epochs):
         # train step (full epoch)
         model.train()
@@ -192,7 +195,8 @@ def main():
     logging.info('===> Building model')
     logging.info(args)
     model = load_arch(args)
-    resume_info = dict(epoch=0, best_valid_metric=0.0 if not args.autoencoder else inf, epochs_without_improvement=0)
+    resume_info = dict(epoch=0, best_valid_metric=0.0 if not args.autoencoder else inf, epochs_without_improvement=0,
+                       mode='autoencoder' if args.autoencoder else 'classifier')
     if os.path.exists('checkpoint_last.pt'):
         model.load_state_dict(torch.load('checkpoint_last.pt'))
         resume_info = json.loads(open('resume_info.json', 'r').read())
@@ -214,6 +218,8 @@ def main():
     else:
         logging.error("Criterion not implemented")
         raise NotImplementedError()
+    if args.autoencoder:
+        criterion = nn.MSELoss()
 
     device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
     model.to(device)
