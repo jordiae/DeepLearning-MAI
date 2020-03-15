@@ -12,11 +12,11 @@ class PyramidCNN(nn.Module):
         self.dropout = not args.no_dropout
         self.dropout_ = nn.Dropout()
         self.batch_norm = not args.no_batch_norm
-        self.pool = nn.MaxPool2d(2, 2)
+        self.pool = None if args.no_pool else nn.MaxPool2d(2, 2)
         self.conv_layers = nn.ModuleList([])
         self.n_classes = 67
         self.input_size = 256
-        self.stride = 1
+        self.stride = 2 if args.no_pool else 1
         self.padding = self.kernel_size//2
         self.channels_in = 3
         self.channels_first_in = args.initial_channels
@@ -61,7 +61,8 @@ class PyramidCNN(nn.Module):
             else:
                 x = F.relu(conv_layer(x))
             if idx % self.n_conv_layers == 0:
-                x = self.pool(x)
+                if self.pool:
+                    x = self.pool(x)
         x = torch.cat([torch.squeeze(self.pool_channels_max(x)), torch.squeeze(self.pool_channels_max(x))], 1)
         x = x.view(-1, self.dims_in_fc)
         for fc_layer in self.fc_layers[:-1]:
