@@ -42,11 +42,38 @@ def evaluate(data_loader, model, device):
     return accuracy, correct, avg_loss, class_report, len(data_loader.dataset)
 
 
+def evaluate_ensemble(data_loader, models, device):
+    avg_loss = 0
+    correct = 0
+    y_output = []
+    y_ground_truth = []
+    with torch.no_grad():
+        for data, target in data_loader:
+            data, target = data.to(device), target.to(device)
+            models[0].eval()
+            output = models[0](data)
+            for model in models[1:]:
+                model.eval()
+                output += model(data)
+
+            avg_loss += F.nll_loss(output, target, reduction='sum').item()  # sum batch loss
+            pred = output.argmax(dim=1, keepdim=True)  # index of the max log-probability
+            correct += pred.eq(target.view_as(pred)).sum().item()
+            y_output += torch.squeeze(pred).tolist()
+            y_ground_truth += torch.squeeze(target).tolist()
+
+        avg_loss /= len(data_loader.dataset)
+    accuracy = 100. * correct / len(data_loader.dataset)
+    class_report = classification_report(y_ground_truth, y_output)
+    return accuracy, correct, avg_loss, class_report, len(data_loader.dataset)
+
+
+
 if __name__ == '__main__':
     # TODO: test whether it works
     parser = argparse.ArgumentParser(description='Evaluate a CNN for mit67')
     parser.add_argument('--arch', type=str, help='Architecture')
-    parser.add_argument('--model-path', type=str, help='Path to model directory')
+    parser.add_argument('--models-path', type=str, help='Path to model directory',nargs='+')
     parser.add_argument('--checkpoint', type=str, default='checkpoint_best.pt',  help='Checkpoint name')
     parser.add_argument('--data', type=str, help='Dataset', default='256x256-split')
     parser.add_argument('--subset', type=str, help='Data subset', default='test')
@@ -57,13 +84,6 @@ if __name__ == '__main__':
     logging.basicConfig(filename=log_path, level=logging.INFO)
     logging.getLogger('').addHandler(logging.StreamHandler())
 
-    if args.arch == 'PyramidCNN':
-        with open(os.path.join(args.model_path, 'args.json'), 'r') as f:
-                train_args = ArgsStruct(**json.load(f))
-        model = load_arch(train_args)
-    else:
-        model = load_arch(None)
-    model.load_state_dict(torch.load(os.path.join(args.model_path, args.checkpoint)))
     transform = transforms.Compose(
         [transforms.ToTensor(),
          transforms.Normalize((0.5, 0.5, 0.5),
@@ -71,6 +91,22 @@ if __name__ == '__main__':
     dataset = Mit67Dataset(os.path.join('..', '..', 'data', 'mit67', args.data, args.subset), transform=transform)
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
     device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
-    model.to(device)
-    eval_res = evaluate(data_loader, model, device)
+
+    models = []
+    for path in args.models_path:
+        if args.arch == 'PyramidCNN':
+            with open(os.path.join(path, 'args.json'), 'r') as f:
+                    train_args = ArgsStruct(**json.load(f))
+            model = load_arch(train_args)
+        else:
+            model = load_arch(None)
+        model.load_state_dict(torch.load(os.path.join(path, args.checkpoint)))
+        model.to(device)
+        models.append(model)
+
+    if len(models) == 1:
+        eval_res = evaluate(data_loader, models[0], device)
+    else:
+        eval_res = evaluate_ensemble(data_loader, models, device)
+
     logging.info(prettify_eval(args.subset, *eval_res))
