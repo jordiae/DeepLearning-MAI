@@ -88,10 +88,10 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
             writer.add_scalar('Avg-loss/valid', loss_val / total, epoch + 1)
 
         torch.save(model.state_dict(), 'checkpoint_last.pt')
-        if (args.autoencoder and loss_val < best_valid_metric) or\
+        if (args.autoencoder and loss_val/total < best_valid_metric) or\
                 (not args.autoencoder and accuracy > best_valid_metric):
             epochs_without_improvement = 0
-            best_valid_metric = loss_val if args.autoencoder else accuracy
+            best_valid_metric = loss_val/total if args.autoencoder else accuracy
             torch.save(model.state_dict(), 'checkpoint_best.pt')
             if not args.autoencoder:
                 logging.info(f'best valid accuracy: {accuracy:.2f}')
