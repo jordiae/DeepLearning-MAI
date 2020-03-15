@@ -23,6 +23,9 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
     model.train()
     if resume_info['mode'] == 'autoencoder' and not args.autoencoder:
         logging.info('Starting training from pre-trained encoder')
+        best_valid_metric = 0.0
+        epochs_without_improvement = 0
+        resume_info['epoch'] = 0
     else:
         best_valid_metric = resume_info['best_valid_metric']
         epochs_without_improvement = resume_info['epochs_without_improvement']
