@@ -106,6 +106,8 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
             if args.early_stop != -1 and epochs_without_improvement == args.early_stop:
                 break
         logging.info(f'{epochs_without_improvement} epochs without improvement in validation set')
+        with open('resume_info.json', 'w') as f:
+            json.dump(resume_info.__dict__, f, indent=2)
     if not args.autoencoder:
         model = load_arch(args)
         model.load_state_dict(torch.load('checkpoint_best.pt'))
