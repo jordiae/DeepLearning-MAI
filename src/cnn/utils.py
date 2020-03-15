@@ -32,6 +32,8 @@ def load_arch(args):
         model = AlbertCNN()
     elif args.arch == 'PyramidCNN':
         model = PyramidCNN(args)
+    elif args.arch == 'AutoEncoder':
+        model = AutoEncoder(args)
     else:
         raise NotImplementedError()
     return model
