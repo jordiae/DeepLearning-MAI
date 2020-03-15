@@ -110,6 +110,9 @@ def main():
     parser.add_argument('--fc-layers', type=int, help='N fully-connected layers', default=3)
     parser.add_argument('--initial-channels', type=int, help='Channels out in first convolutional layer', default=16)
 
+    parser.add_argument('--crop', action='store_true', help='Crop images instead of resizing')
+    parser.add_argument('--resize-crop-dimension', type=int, help='Dimension of the resize or crop', default=256)
+
     args = parser.parse_args()
     log_path = 'train.log'
     if os.path.exists('checkpoint_last.pt'):
@@ -127,10 +130,15 @@ def main():
                               (0.5, 0.5, 0.5))])
     if not args.no_augment:
         #  to randomly pick and apply the transformations
+        dimension = args.resize_crop_dimension
+        crop_resize_transform = transforms.Resize(size=(dimension, dimension))
+        if args.crop:
+            crop_resize_transform = transforms.RandomCrop(dimension,
+                                                          pad_if_needed=True,
+                                                          padding_mode='symmetric')
+
         transform = transforms.Compose([
-            transforms.RandomCrop(256,
-                                  pad_if_needed=True,
-                                  padding_mode='symmetric'),
+            crop_resize_transform,
             transforms.RandomApply(
                 [transforms.RandomChoice([
                     transforms.RandomAffine(0, shear=10),
