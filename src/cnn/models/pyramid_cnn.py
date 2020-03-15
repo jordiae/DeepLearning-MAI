@@ -16,7 +16,8 @@ class PyramidCNN(nn.Module):
         self.conv_layers = nn.ModuleList([])
         self.n_classes = 67
         self.input_size = 256
-        self.stride = 2 if args.no_pool else 1
+        self.stride = 1
+        self.stride_end_block = 2
         self.padding = self.kernel_size//2
         self.channels_in = 3
         self.channels_first_in = args.initial_channels
@@ -30,8 +31,14 @@ class PyramidCNN(nn.Module):
             else:
                 channels_out = channels_in*2
             for j in range(0, args.conv_layers):
-                dims = ((dims - self.kernel_size + 2 * self.padding) * self.stride + 1)
-                conv = nn.Conv2d(channels_in, channels_out, self.kernel_size, stride=self.stride, padding=self.padding)
+                if j == args.conv_layers-1 and args.no_pool:
+                    dims = ((dims - self.kernel_size + 2 * self.padding) * self.stride_end_block + 1)
+                    conv = nn.Conv2d(channels_in, channels_out, self.kernel_size, stride=self.stride_end_block,
+                                     padding=self.padding)
+                else:
+                    dims = ((dims - self.kernel_size + 2 * self.padding) * self.stride + 1)
+                    conv = nn.Conv2d(channels_in, channels_out, self.kernel_size, stride=self.stride,
+                                     padding=self.padding)
                 if self.batch_norm:
                     self.conv_layers.append(nn.ModuleList([conv, nn.BatchNorm2d(channels_out)]))
                 else:
