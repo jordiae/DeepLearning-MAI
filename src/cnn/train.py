@@ -12,16 +12,16 @@ from torch.utils.tensorboard import SummaryWriter
 from cnn.utils import load_arch
 
 
-def train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging):
+def train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging, resume_info):
     writer = SummaryWriter()
     with open('args.json', 'w') as f:
         json.dump(args.__dict__, f, indent=2)
     logging.info(args)
     logging.info(model)
     model.train()
-    best_valid_accuracy = 0.0
-    epochs_without_improvement = 0
-    for epoch in range(args.epochs):
+    best_valid_accuracy = resume_info['best_valid_accuracy']
+    epochs_without_improvement = resume_info['epochs_without_improvement']
+    for epoch in range(resume_info['epoch'], args.epochs):
         # train step (full epoch)
         model.train()
         logging.info(f'Epoch {epoch+1} |')
@@ -79,7 +79,8 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
         logging.info(f'{epochs_without_improvement} epochs without improvement in validation set')
 
     model = load_arch(args)
-    model.load_state_dict(torch.load(args.model))
+    model.load_state_dict(torch.load('checkpoint_best.pt'))
+    model.to(device)
     eval_res = evaluate(valid_loader, model, device)
     logging.info(prettify_eval('train', *eval_res))
 
@@ -110,9 +111,11 @@ def main():
     parser.add_argument('--initial-channels', type=int, help='Channels out in first convolutional layer', default=16)
 
     args = parser.parse_args()
-
     log_path = 'train.log'
-    logging.basicConfig(filename=log_path, level=logging.INFO)
+    if os.path.exists('checkpoint_last.pt'):
+        logging.basicConfig(filename=log_path, level=logging.INFO, filemode='a')
+    else:
+        logging.basicConfig(filename=log_path, level=logging.INFO)
     logging.getLogger('').addHandler(logging.StreamHandler())
 
     logging.info('===> Loading datasets')
@@ -151,7 +154,11 @@ def main():
     logging.info('===> Building model')
     logging.info(args)
     model = load_arch(args)
-
+    resume_info = dict(epoch=0, best_valid_accuracy=0.0, epochs_without_improvement=0)
+    if os.path.exists('checkpoint_last.pt'):
+        model.load_state_dict(torch.load('checkpoint_last.pt'))
+        resume_info = json.loads(open('resume_info.json', 'r').read())
+        logging.info('Resuming training from checkpoint...')
     if args.optimizer == 'SGD':
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     elif args.optimizer == 'Adam':
@@ -170,7 +177,7 @@ def main():
     model.to(device)
 
     logging.info('===> Training')
-    train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging)
+    train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging, resume_info)
 
 
 if __name__ == '__main__':
