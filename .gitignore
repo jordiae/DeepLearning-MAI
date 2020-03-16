@@ -3,3 +3,4 @@ venv/*
 data/mit67/*
 experiments/*
 *.pyc
+__pycache__
