@@ -11,6 +11,7 @@ import json
 from torch.utils.tensorboard import SummaryWriter
 from cnn.utils import load_arch
 from cnn.utils import SmoothCrossEntropyLoss
+from math import inf
 
 
 def train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging, resume_info):
@@ -20,35 +21,49 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
     logging.info(args)
     logging.info(model)
     model.train()
-    best_valid_accuracy = resume_info['best_valid_accuracy']
-    epochs_without_improvement = resume_info['epochs_without_improvement']
+    if resume_info['mode'] == 'autoencoder' and not args.autoencoder:
+        logging.info('Starting training from pre-trained encoder')
+        best_valid_metric = 0.0
+        epochs_without_improvement = 0
+        resume_info['epoch'] = 0
+    else:
+        best_valid_metric = resume_info['best_valid_metric']
+        epochs_without_improvement = resume_info['epochs_without_improvement']
     for epoch in range(resume_info['epoch'], args.epochs):
         # train step (full epoch)
         model.train()
         logging.info(f'Epoch {epoch+1} |')
         loss_train = 0.0
         total = 0
-        correct = 0
+        if not args.autoencoder:
+            correct = 0
         for idx, data in enumerate(train_loader):
             if (idx+1) % 10 == 0:
                 logging.info(f'{idx+1}/{len(train_loader)} batches')
             inputs, labels = data[0].to(device), data[1].to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
-            _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
-            correct += (predicted == labels).sum().item()
-            loss = criterion(outputs, labels)
+            if not args.autoencoder:
+                _, predicted = torch.max(outputs.data, 1)
+                correct += (predicted == labels).sum().item()
+                loss = criterion(outputs, labels)
+            else:
+                loss = criterion(outputs, inputs)
             loss.backward()
             optimizer.step()
             loss_train += loss.item()
-        accuracy = 100 * correct / total
-        logging.info(f'train: avg_loss = {loss_train/total:.5f} | accuracy = {accuracy:.2f}')
-        writer.add_scalar('Avg-loss/train', loss_train/total, epoch+1)
-        writer.add_scalar('Accuracy/train', accuracy, epoch + 1)
-
+        if not args.autoencoder:
+            accuracy = 100 * correct / total
+            logging.info(f'train: avg_loss = {loss_train/total:.5f} | accuracy = {accuracy:.2f}')
+            writer.add_scalar('Avg-loss/train', loss_train/total, epoch+1)
+            writer.add_scalar('Accuracy/train', accuracy, epoch + 1)
+        else:
+            logging.info(f'train: avg_loss = {loss_train/total:.5f}')
+            writer.add_scalar('Avg-loss/train', loss_train / total, epoch + 1)
         # valid step
-        correct = 0
+        if not args.autoencoder:
+            correct = 0
         total = 0
         loss_val = 0
         model.eval()
@@ -56,34 +71,52 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
             for data in valid_loader:
                 images, labels = data[0].to(device), data[1].to(device)
                 outputs = model(images)
-                loss = criterion(outputs, labels)
+                if not args.autoencoder:
+                    loss = criterion(outputs, labels)
+                else:
+                    loss = criterion(outputs, images)
                 loss_val += loss
-                _, predicted = torch.max(outputs.data, 1)
+
                 total += labels.size(0)
-                correct += (predicted == labels).sum().item()
-        accuracy = 100 * correct/total
-        logging.info(f'valid: avg_loss = {loss_val/total:.5f} | accuracy = {accuracy:.2f}')
-        writer.add_scalar('Avg-loss/valid', loss_val / total, epoch + 1)
-        writer.add_scalar('Accuracy/valid', accuracy, epoch + 1)
+                if not args.autoencoder:
+                    _, predicted = torch.max(outputs.data, 1)
+                    correct += (predicted == labels).sum().item()
+        if not args.autoencoder:
+            accuracy = 100 * correct/total
+            logging.info(f'valid: avg_loss = {loss_val/total:.5f} | accuracy = {accuracy:.2f}')
+            writer.add_scalar('Avg-loss/valid', loss_val / total, epoch + 1)
+            writer.add_scalar('Accuracy/valid', accuracy, epoch + 1)
+        else:
+            logging.info(f'valid: avg_loss = {loss_val/total:.5f}')
+            writer.add_scalar('Avg-loss/valid', loss_val / total, epoch + 1)
 
         torch.save(model.state_dict(), 'checkpoint_last.pt')
-        if accuracy > best_valid_accuracy:
+        if (args.autoencoder and loss_val/total < best_valid_metric) or\
+                (not args.autoencoder and accuracy > best_valid_metric):
             epochs_without_improvement = 0
-            best_valid_accuracy = accuracy
+            best_valid_metric = loss_val/total if args.autoencoder else accuracy
             torch.save(model.state_dict(), 'checkpoint_best.pt')
-            logging.info(f'best valid accuracy: {accuracy:.2f}')
+            if not args.autoencoder:
+                logging.info(f'best valid accuracy: {accuracy:.2f}')
+            else:
+                logging.info(f'best valid loss: {loss_val:.2f}')
         else:
             epochs_without_improvement += 1
-            logging.info(f'best valid accuracy: {best_valid_accuracy:.2f}')
+            if not args.autoencoder:
+                logging.info(f'best valid accuracy: {best_valid_metric:.2f}')
+            else:
+                logging.info(f'best valid loss: {best_valid_metric:.2f}')
             if args.early_stop != -1 and epochs_without_improvement == args.early_stop:
                 break
         logging.info(f'{epochs_without_improvement} epochs without improvement in validation set')
-
-    model = load_arch(args)
-    model.load_state_dict(torch.load('checkpoint_best.pt'))
-    model.to(device)
-    eval_res = evaluate(valid_loader, model, device)
-    logging.info(prettify_eval('train', *eval_res))
+        with open('resume_info.json', 'w') as f:
+            json.dump(resume_info, f, indent=2)
+    if not args.autoencoder:
+        model = load_arch(args)
+        model.load_state_dict(torch.load('checkpoint_best.pt'))
+        model.to(device)
+        eval_res = evaluate(valid_loader, model, device)
+        logging.info(prettify_eval('train', *eval_res))
 
 
 def main():
@@ -115,6 +148,8 @@ def main():
 
     parser.add_argument('--crop', action='store_true', help='Crop images instead of resizing')
     parser.add_argument('--resize-crop-dimension', type=int, help='Dimension of the resize or crop', default=256)
+
+    parser.add_argument('--autoencoder', action='store_true', help='Train autoencoder instead of classification')
 
     args = parser.parse_args()
     log_path = 'train.log'
@@ -165,7 +200,8 @@ def main():
     logging.info('===> Building model')
     logging.info(args)
     model = load_arch(args)
-    resume_info = dict(epoch=0, best_valid_accuracy=0.0, epochs_without_improvement=0)
+    resume_info = dict(epoch=0, best_valid_metric=0.0 if not args.autoencoder else inf, epochs_without_improvement=0,
+                       mode='autoencoder' if args.autoencoder else 'classifier')
     if os.path.exists('checkpoint_last.pt'):
         model.load_state_dict(torch.load('checkpoint_last.pt'))
         resume_info = json.loads(open('resume_info.json', 'r').read())
@@ -182,9 +218,13 @@ def main():
         criterion = nn.CrossEntropyLoss()
     elif args.criterion == 'label-smooth':
         criterion = SmoothCrossEntropyLoss(smoothing=args.smooth_criterion)
+    elif args.criterion == 'mse':
+        criterion = nn.MSELoss()
     else:
         logging.error("Criterion not implemented")
         raise NotImplementedError()
+    if args.autoencoder:
+        criterion = nn.MSELoss()
 
     device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
     model.to(device)
