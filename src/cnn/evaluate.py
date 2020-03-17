@@ -2,7 +2,8 @@ import torch
 import torch.nn.functional as F
 from sklearn.metrics import classification_report
 import argparse
-from torchvision import transforms
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 import os
 from cnn.dataset import Mit67Dataset
 import json
@@ -84,10 +85,13 @@ if __name__ == '__main__':
     logging.basicConfig(filename=log_path, level=logging.INFO)
     logging.getLogger('').addHandler(logging.StreamHandler())
 
-    transform = transforms.Compose(
-        [transforms.ToTensor(),
-         transforms.Normalize((0.5, 0.5, 0.5),
-                              (0.5, 0.5, 0.5))])
+    transform = A.Compose(
+            [
+                A.Normalize(
+                    mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225]),
+                ToTensorV2()
+            ])
     dataset = Mit67Dataset(os.path.join('..', '..', 'data', 'mit67', args.data, args.subset), transform=transform)
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
     device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")

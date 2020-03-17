@@ -4,7 +4,8 @@ import os
 import logging
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import transforms
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 from cnn.evaluate import evaluate, prettify_eval
 from cnn.dataset import Mit67Dataset
 import json
@@ -162,37 +163,65 @@ def main():
     logging.info('===> Loading datasets')
     data_path = os.path.join('..', '..', 'data', 'mit67', args.data)
 
-    transform = transforms.Compose(
-        [transforms.ToTensor(),  # scale to [0,1] float tensor
-         transforms.Normalize((0.5, 0.5, 0.5),
-                              (0.5, 0.5, 0.5))])
+    transform = A.Compose(
+            [
+                A.Normalize(
+                    mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225]),
+                ToTensorV2()
+            ])
+
     if not args.no_augment:
-        #  to randomly pick and apply the transformations
-        dimension = args.resize_crop_dimension
-        crop_resize_transform = transforms.Resize(size=(dimension, dimension))
-        if args.crop:
-            crop_resize_transform = transforms.RandomCrop(dimension,
-                                                          pad_if_needed=True,
-                                                          padding_mode='symmetric')
+        albumentations_transform = A.Compose(
+            [
+                A.HorizontalFlip(p=0.5),  # apply horizontal flip to 50% of images
+                A.ShiftScaleRotate(p=0.3),
+                A.OneOf(
+                    [
+                        # apply one of transforms to 50% of images
+                        A.RandomBrightnessContrast(),  # apply random contrast
+                        A.RandomGamma(),  # apply random gamma
+                    ],
+                    p=0.5
+                ),
+                A.OneOf(
+                    [
+                        # apply one of transforms to 50% images
+                        A.ElasticTransform(
+                            alpha=120,
+                            sigma=120 * 0.05,
+                            alpha_affine=120 * 0.03
+                        ),
+                        A.GridDistortion(),
+                        A.OpticalDistortion(
+                            distort_limit=2,
+                            shift_limit=0.5
+                        ),
+                    ],
+                    p=0.5
+                ),
+                A.OneOf(
+                    [
+                        # apply one of transforms to 20% of images
+                        A.Blur(),
+                        A.CoarseDropout(max_holes=5,
+                                        max_height=35,
+                                        max_width=35)
+                    ],
+                    p=0.2
+                ),
+                A.Normalize(
+                    mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225]),
 
-        transform = transforms.Compose([
-            crop_resize_transform,
-            transforms.RandomApply(
-                [transforms.RandomChoice([
-                    transforms.RandomAffine(0, shear=10),
-                    transforms.RandomRotation(25),
-                    ])], p=0.2),
-            transforms.RandomChoice([
-                transforms.RandomHorizontalFlip(),
-                transforms.ColorJitter()  # Randomly change the brightness, contrast and saturation
-            ]),
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5),
-                                 (0.5, 0.5, 0.5))
-         ])
+                ToTensorV2()
+            ],
+            p=1
+        )
+    else:
+        albumentations_transform = transform
 
-    train_dataset = Mit67Dataset(os.path.join(data_path, 'train'), transform=transform)
-
+    train_dataset = Mit67Dataset(os.path.join(data_path, 'train'), transform=albumentations_transform)
     valid_dataset = Mit67Dataset(os.path.join(data_path, 'valid'), transform=transform)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False)

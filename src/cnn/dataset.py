@@ -1,5 +1,6 @@
 from torch.utils.data.dataset import Dataset
 import os
+import cv2
 from PIL import Image
 import numpy as np
 from sklearn.preprocessing import LabelEncoder  # CrossEntropyLoss expects class indices
@@ -29,7 +30,9 @@ class Mit67Dataset(Dataset):
     def __getitem__(self, index):
         img = Image.open(self.X[index])
         if self.transform is not None:
-            img = self.transform(img)
+            image_np = np.array(img)
+            augmented = self.transform(image=image_np)
+            img = augmented['image']
         label = self.y[index]
         return img, label
 
