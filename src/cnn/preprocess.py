@@ -154,7 +154,7 @@ if __name__ == '__main__':
     logging.info(date.today())
     original_data_path = os.path.join('..', '..', 'data', 'mit67', 'Images')
     remove_bw = True
-    resize_data = False
+    resize_data = True
     new_size = (256, 256)
     resized_path = os.path.join('..', '..', 'data', 'mit67', f'{new_size[0]}x{new_size[1]}')
     if resize_data:
