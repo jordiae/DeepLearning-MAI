@@ -69,12 +69,11 @@ def evaluate_ensemble(data_loader, models, device):
     return accuracy, correct, avg_loss, class_report, len(data_loader.dataset)
 
 
-
 if __name__ == '__main__':
-    # TODO: test whether it works
     parser = argparse.ArgumentParser(description='Evaluate a CNN for mit67')
     parser.add_argument('--arch', type=str, help='Architecture')
-    parser.add_argument('--models-path', type=str, help='Path to model directory',nargs='+')
+    parser.add_argument('--models-path', type=str, help='Path to model directory. If more than one path is provided, an'
+                                                        'ensemble of models os loaded', nargs='+')
     parser.add_argument('--checkpoint', type=str, default='checkpoint_best.pt',  help='Checkpoint name')
     parser.add_argument('--data', type=str, help='Dataset', default='256x256-split')
     parser.add_argument('--subset', type=str, help='Data subset', default='test')
