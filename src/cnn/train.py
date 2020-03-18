@@ -169,21 +169,19 @@ def main():
             ])
 
     if not args.no_augment:
-        albumentations_transform = A.Compose(
+        aug_transform = A.Compose(
             [
-                A.HorizontalFlip(p=0.5),  # apply horizontal flip to 50% of images
+                A.HorizontalFlip(p=0.5),
                 A.ShiftScaleRotate(p=0.3),
                 A.OneOf(
                     [
-                        # apply one of transforms to 50% of images
-                        A.RandomBrightnessContrast(),  # apply random contrast
-                        A.RandomGamma(),  # apply random gamma
+                        A.RandomBrightnessContrast(),
+                        A.RandomGamma(),
                     ],
                     p=0.5
                 ),
                 A.OneOf(
                     [
-                        # apply one of transforms to 50% images
                         A.ElasticTransform(
                             alpha=120,
                             sigma=120 * 0.05,
@@ -199,7 +197,6 @@ def main():
                 ),
                 A.OneOf(
                     [
-                        # apply one of transforms to 20% of images
                         A.Blur(),
                         A.CoarseDropout(max_holes=5,
                                         max_height=35,
@@ -210,15 +207,14 @@ def main():
                 A.Normalize(
                     mean=[0.485, 0.456, 0.406],
                     std=[0.229, 0.224, 0.225]),
-
                 ToTensorV2()
             ],
             p=1
         )
     else:
-        albumentations_transform = transform
+        aug_transform = transform
 
-    train_dataset = Mit67Dataset(os.path.join(data_path, 'train'), transform=albumentations_transform)
+    train_dataset = Mit67Dataset(os.path.join(data_path, 'train'), transform=aug_transform)
     valid_dataset = Mit67Dataset(os.path.join(data_path, 'valid'), transform=transform)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False)
