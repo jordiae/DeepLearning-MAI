@@ -31,7 +31,7 @@ def evaluate(data_loader, model, device):
         for data, target in data_loader:
             data, target = data.to(device), target.to(device)
             output = model(data)
-            avg_loss += F.nll_loss(output, target, reduction='sum').item()  # sum batch loss
+            avg_loss += F.cross_entropy(output, target, reduction='sum').item()  # sum batch loss
             pred = output.argmax(dim=1, keepdim=True)  # index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
             y_output += torch.squeeze(pred).tolist()
@@ -57,7 +57,7 @@ def evaluate_ensemble(data_loader, models, device):
                 model.eval()
                 output += model(data)
 
-            avg_loss += F.nll_loss(output, target, reduction='sum').item()  # sum batch loss
+            avg_loss += F.cross_entropy(output, target, reduction='sum').item()  # sum batch loss
             pred = output.argmax(dim=1, keepdim=True)  # index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
             y_output += torch.squeeze(pred).tolist()
