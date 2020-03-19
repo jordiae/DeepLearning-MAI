@@ -11,7 +11,7 @@ from cnn.dataset import Mit67Dataset
 import json
 from torch.utils.tensorboard import SummaryWriter
 from cnn.utils import load_arch
-from cnn.utils import SmoothCrossEntropyLoss
+from cnn.utils import LabelSmoothingLoss
 from math import inf
 
 
@@ -239,7 +239,7 @@ def main():
     if args.criterion == 'cross-entropy':
         criterion = nn.CrossEntropyLoss()
     elif args.criterion == 'label-smooth':
-        criterion = SmoothCrossEntropyLoss(smoothing=args.smooth_criterion)
+        criterion = LabelSmoothingLoss(smoothing=args.smooth_criterion)
     elif args.criterion == 'mse':
         criterion = nn.MSELoss()
     else:

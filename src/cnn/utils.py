@@ -3,8 +3,8 @@ import os
 from PIL import Image
 
 import torch
-from torch.nn.modules.loss import _WeightedLoss
 import torch.nn.functional as F
+from torch import nn
 
 from cnn.models import *
 
@@ -29,36 +29,25 @@ def load_arch(args):
     return model
 
 
-class SmoothCrossEntropyLoss(_WeightedLoss):
-    def __init__(self, weight=None, reduction='mean', smoothing=0.0):
-        super().__init__(weight=weight, reduction=reduction)
+class LabelSmoothingLoss(nn.Module):
+    def __init__(self, smoothing=0.0):
+        super(LabelSmoothingLoss, self).__init__()
         self.smoothing = smoothing
-        self.weight = weight
-        self.reduction = reduction
 
-    @staticmethod
-    def _smooth_one_hot(targets:torch.Tensor, n_classes:int, smoothing=0.0):
+    def smooth_one_hot(self, target, classes, smoothing=0.0):
         assert 0 <= smoothing < 1
+        shape = (target.size(0), classes)
         with torch.no_grad():
-            targets = torch.empty(size=(targets.size(0), n_classes),
-                    device=targets.device) \
-                .fill_(smoothing /(n_classes-1)) \
-                .scatter_(1, targets.data.unsqueeze(1), 1.-smoothing)
-        return targets
+            target = torch.empty(size=shape, device=target.device) \
+                .fill_(smoothing / (classes - 1)) \
+                .scatter_(1, target.data.unsqueeze(1), 1. - smoothing)
 
-    def forward(self, inputs, targets):
-        targets = SmoothCrossEntropyLoss._smooth_one_hot(targets, inputs.size(-1),
-            self.smoothing)
-        lsm = F.log_softmax(inputs, -1)
+        return target
 
-        if self.weight is not None:
-            lsm = lsm * self.weight.unsqueeze(0)
-
-        loss = -(targets * lsm).sum(-1)
-
-        if  self.reduction == 'sum':
-            loss = loss.sum()
-        elif  self.reduction == 'mean':
-            loss = loss.mean()
+    def forward(self, input, target):
+        target = LabelSmoothingLoss.smooth_one_hot(self, target, input.size(-1), self.smoothing)
+        lsm = F.log_softmax(input, -1)
+        loss = -(target * lsm).sum(-1)
+        loss = loss.mean()
 
         return loss
