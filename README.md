@@ -55,7 +55,7 @@ python src/cnn/train.py [options]
 
 ```
 
-The training options are the following:
+The training options are the following (note that the defaults have been optimized for performance in the validation set):
 ```
 parser = argparse.ArgumentParser(description='Train a CNN for mit67')
 parser.add_argument('--arch', type=str, help='Architecture', default='PyramidCNN')
@@ -139,8 +139,6 @@ conclusions:
     - Since the images present in the dataset have global features, we tried to incorporate Non-Local blocks
     (<https://arxiv.org/abs/1711.07971>), but we did not observe any gains.
 
-The best found configuration was evaluated in the test set, obtaining an accuracy of XXX and a F1-Score of YYY. In the
-confusion matrix, we observe that some classes obtain very bad scores, and this corresponds to our intuition when
-visually inspecting the dataset (eg. class ZZZ is very difficult to get right).
+The best found configuration, corresponding to the default values in the ```train.py``` script, obtained an accuracy of  58  in the validation set. Then, we build an ensemble of 10 independently trained classifiers with the same configuration, and obtained a validation accuracy of 64. We selected this ensemble as our final model, and obtained a test accuracy of 63.
 
 ## Recurrent Neural Networks
