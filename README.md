@@ -1,6 +1,9 @@
 # Deep Learning assignments (DL-MAI)
 
-This is the repository containing the source code for the assignments of the Deep Learning course at the Master in Artificial Intelligence at UPC-BarcelonaTech. The code is based on PyTorch.
+This is the repository containing the source code for the assignments of the Deep Learning course at the Master in Artificial Intelligence at UPC-BarcelonaTech. The code is based on PyTorch. Authors:
+
+    - Jordi Armengol
+    - Albert Rial
 
 ## Requirements
 
