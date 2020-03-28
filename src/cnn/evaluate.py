@@ -63,7 +63,7 @@ def evaluate_ensemble(data_loader, models, device):
             y_output += torch.squeeze(pred).tolist()
             y_ground_truth += torch.squeeze(target).tolist()
 
-        avg_loss /= len(data_loader.dataset)
+        avg_loss = avg_loss / len(data_loader.dataset) / len(models)
     accuracy = 100. * correct / len(data_loader.dataset)
     class_report = classification_report(y_ground_truth, y_output)
     return accuracy, correct, avg_loss, class_report, len(data_loader.dataset)
