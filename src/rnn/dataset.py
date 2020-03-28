@@ -27,7 +27,7 @@ class MathDataset(Dataset):
         assert self.subset in subsets
         assert token2idx is None if self.subset == 'train' else len(token2idx) > 0
         assert idx2token is None if self.subset == 'train' else len(idx2token) > 0
-        assert (token2idx is None and idx2token is None) or len(token2idx) == idx2token
+        assert (token2idx is None and idx2token is None) or len(token2idx) == len(idx2token)
         assert sum(self.props) == 100
         self.unk_token_idx = 0
         self.unk_token = '<UNK>'
@@ -64,17 +64,20 @@ class MathDataset(Dataset):
                 idx_x = 0
                 for idx, line in tqdm(enumerate(f.readlines()), disable=not self.debug,
                                       total=self.lines_debug*(self.proportions[self.subset])//100):
+                    if len(line.split()) == 0:
+                        break
                     if idx % 2 == 0:
                         if not check_idx(idx, self.subset):
                             idx_x += 1
                             continue
                         x = []
                         for c in line:
-                            if c.isalnum():
-                                c = c.lower() if self.lower else c
-                                if subset == 'train':
-                                    self.__add_token(c)
-                                x.append(self.token2idx[c])
+                            if c == '\n':
+                                break
+                            c = c.lower() if self.lower and c.isalnum() else c
+                            if subset == 'train':
+                                self.__add_token(c)
+                            x.append(self.token2idx[c])
                         self.X.append(x)
                         self.lengths.append(len(x))
                         idx_x += 1
@@ -83,17 +86,19 @@ class MathDataset(Dataset):
                             continue
                         y = []
                         for c in line:
-                            if c.isalnum():
-                                c = c.lower() if self.lower else c
-                                if subset == 'train':
-                                    self.__add_token(c)
-                                y.append(self.token2idx[c])
+                            if c == '\n':
+                                break
+                            c = c.lower() if self.lower else c
+                            if subset == 'train':
+                                self.__add_token(c)
+                            y.append(self.token2idx[c])
                         self.Y.append(y)
                         self.lengths[-1] += len(y)
-                    if self.debug and idx == self.lines_debug:
+                    if self.debug and idx >= self.lines_debug and len(self.X) == len(self.Y):
                         break
             if self.debug:
                 break
+        assert len(self.X) == len(self.Y)
         self.data_len = len(self.X)
 
     def __getitem__(self, index: int) -> Tuple[List[int], List[int]]:
@@ -130,14 +135,41 @@ class MathDataset(Dataset):
         assert len(self.X) > 0
         assert not self.sorted
         sorted_idx = np.argsort(self.lengths)
-        self.X, self.Y = [(self.X[i], self.Y[i]) for i in sorted_idx]
+        self.X = [self.X[i] for i in sorted_idx]
+        self.Y = [self.Y[i] for i in sorted_idx]
         self.sorted = True
+
+    def encode(self, to_encode: str) -> List[int]:
+        return list(map(lambda x: self.token2idx[x], to_encode))
+
+    def decode(self, to_decode: List[int]) -> str:
+        return ''.join(list(map(lambda x: self.idx2token[x], to_decode)))
 
 
 if __name__ == '__main__':
+    print('Train')
     dataset = MathDataset(path=os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
                                             'train-easy'), subset='train', debug=True)
+    print(f"first sequence: {(dataset.decode(dataset.X[0]), dataset.decode(dataset.Y[0]))}")
+    print()
+    print(f"Encoded first sequence: {(dataset.X[0], dataset.Y[0])}")
+    print()
+    print('Without sorting by length (length of first instances)')
+    print(list(map(lambda i: len(i[0]) + len(i[1]), zip(dataset.X[0:10], dataset.Y[0:10]))))
     print()
     dataset.sort_by_lengths()
+    print('Having sorted by length (length first instances)')
+    print(list(map(lambda i: len(i[0]) + len(i[1]), zip(dataset.X[0:10], dataset.Y[0:10]))))
     print()
+    token2idx, idx2token, unk_token_idx = dataset.get_vocab()
+    print(f'token2idx: len: {len(token2idx)}, examples: {list(token2idx[e] for e in idx2token[0:10])}')
+    print(f'idx2token: len: {len(idx2token)}, examples: {idx2token[0:10]}')
+    print(f'unk_token_idx: {unk_token_idx}, unk_token: {idx2token[unk_token_idx]}')
+    print()
+    print('Valid')
+    dataset = MathDataset(path=os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
+                                            'train-easy'), subset='valid', debug=True, token2idx=token2idx,
+                          idx2token=idx2token)
+
+
 
