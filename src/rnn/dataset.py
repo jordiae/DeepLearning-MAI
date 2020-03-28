@@ -40,6 +40,8 @@ class MathDataset(Dataset):
         self.debug = debug
         self.lines_debug = 100000
         self.sorted = False
+        self.answer_token = '<ANSWER>'
+        self.eos_token = '<EOS>'
 
         def check_idx(i: int, sub: str) -> bool:
             """
@@ -59,6 +61,8 @@ class MathDataset(Dataset):
             return False
 
         self.lengths = []
+        if self.subset == 'valid':
+            print()
         for problem_type in tqdm(os.listdir(path), disable=self.debug):
             with open(os.path.join(path, problem_type), 'r') as f:
                 idx_x = 0
@@ -67,8 +71,7 @@ class MathDataset(Dataset):
                     if len(line.split()) == 0:
                         break
                     if idx % 2 == 0:
-                        if not check_idx(idx, self.subset):
-                            idx_x += 1
+                        if not check_idx(idx_x, self.subset):
                             continue
                         x = []
                         for c in line:
@@ -78,27 +81,36 @@ class MathDataset(Dataset):
                             if subset == 'train':
                                 self.__add_token(c)
                             x.append(self.token2idx[c])
+                        if subset == 'train':
+                            self.__add_token(self.answer_token)
+                        x.append(self.token2idx[self.answer_token])
                         self.X.append(x)
                         self.lengths.append(len(x))
-                        idx_x += 1
                     else:
-                        if not check_idx(idx, self.subset):
+                        if not check_idx(idx_x, self.subset):
+                            idx_x += 1
                             continue
                         y = []
                         for c in line:
                             if c == '\n':
                                 break
-                            c = c.lower() if self.lower else c
+                            c = c.lower() if self.lower and c.isalnum() else c
                             if subset == 'train':
                                 self.__add_token(c)
                             y.append(self.token2idx[c])
+                        if subset == 'train':
+                            self.__add_token(self.eos_token)
+                        y.append(self.token2idx[self.eos_token])
                         self.Y.append(y)
                         self.lengths[-1] += len(y)
+                        idx_x += 1
                     if self.debug and idx >= self.lines_debug and len(self.X) == len(self.Y):
                         break
             if self.debug:
                 break
-        assert len(self.X) == len(self.Y)
+        #assert len(self.X) == len(self.Y)
+        if len(self.X) != len(self.Y):
+            print()
         self.data_len = len(self.X)
 
     def __getitem__(self, index: int) -> Tuple[List[int], List[int]]:
@@ -121,7 +133,7 @@ class MathDataset(Dataset):
         :return:
         """
         assert self.subset == 'train'
-        assert len(c) == 1
+        assert len(c) == 1 or c == self.eos_token or c == self.answer_token
         if c in self.token2idx:
             return
         self.idx2token.append(c)
