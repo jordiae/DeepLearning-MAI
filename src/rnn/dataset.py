@@ -15,7 +15,7 @@ class MathDataset(Dataset):
         :param idx2token: Inverse of token2idx, ie. list mapping the corresponding index to the original character
         :param lower: whether to convert characters to lowercase. By default, True, because characters don't seem to add
         information in this dataset
-        :param props: proportions of the
+        :param props: proportions of the train-valid-test split
         """
         self.path = path
         self.subset = subset
