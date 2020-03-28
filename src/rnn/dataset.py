@@ -3,6 +3,7 @@ import os
 from typing import Tuple, List, Dict
 from tqdm import tqdm
 import numpy as np
+import torch
 
 
 class MathDataset(Dataset):
@@ -31,8 +32,10 @@ class MathDataset(Dataset):
         assert sum(self.props) == 100
         self.unk_token_idx = 0
         self.unk_token = '<UNK>'
-        self.token2idx = token2idx if token2idx is not None else {self.unk_token: 0}
-        self.idx2token = idx2token if token2idx is not None else [self.unk_token]
+        self.pad_token_idx = 0
+        self.pad_token = '<PAD>'
+        self.token2idx = token2idx if token2idx is not None else {self.unk_token: 0, self.pad_token: 1}
+        self.idx2token = idx2token if token2idx is not None else [self.unk_token, self.pad_token]
         self.proportions = dict(zip(subsets, self.props))
         self.X = []
         self.Y = []
@@ -61,8 +64,6 @@ class MathDataset(Dataset):
             return False
 
         self.lengths = []
-        if self.subset == 'valid':
-            print()
         for problem_type in tqdm(os.listdir(path), disable=self.debug):
             with open(os.path.join(path, problem_type), 'r') as f:
                 idx_x = 0
@@ -80,6 +81,9 @@ class MathDataset(Dataset):
                             c = c.lower() if self.lower and c.isalnum() else c
                             if subset == 'train':
                                 self.__add_token(c)
+                            else:
+                                if c not in self.token2idx:
+                                    c = self.unk_token
                             x.append(self.token2idx[c])
                         if subset == 'train':
                             self.__add_token(self.answer_token)
@@ -97,6 +101,9 @@ class MathDataset(Dataset):
                             c = c.lower() if self.lower and c.isalnum() else c
                             if subset == 'train':
                                 self.__add_token(c)
+                            else:
+                                if c not in self.token2idx:
+                                    c = self.unk_token
                             y.append(self.token2idx[c])
                         if subset == 'train':
                             self.__add_token(self.eos_token)
@@ -108,12 +115,11 @@ class MathDataset(Dataset):
                         break
             if self.debug:
                 break
-        #assert len(self.X) == len(self.Y)
-        if len(self.X) != len(self.Y):
-            print()
+        assert len(self.X) == len(self.Y)
         self.data_len = len(self.X)
 
     def __getitem__(self, index: int) -> Tuple[List[int], List[int]]:
+        #return torch.tensor(self.X[index]), torch.tensor(self.Y[index])
         return self.X[index], self.Y[index]
 
     def __len__(self) -> int:
@@ -183,5 +189,23 @@ if __name__ == '__main__':
                                             'train-easy'), subset='valid', debug=True, token2idx=token2idx,
                           idx2token=idx2token)
 
+    # TODO: padding
 
+    from torch.utils.data import DataLoader
+    from math import inf
 
+    def custom_collate(data):
+        pad = 0
+        # https://discuss.pytorch.org/t/how-to-create-batches-of-a-list-of-varying-dimension-tensors/50773/14
+        # assuming longest sequence is the last one
+        longest = len(batch[-1][0]) + len(batch[-1][1])
+        for sample_input, sample_output in batch:
+            if len(sample_input) + sample_output < longest:
+                pass
+        return input_, target
+    # sampler: https://github.com/pytorch/pytorch/blob/master/torch/utils/data/dataloader.py
+    train_loader = DataLoader(dataset, batch_size=10, shuffle=True, collate_fn=custom_collate, sampler=None)
+    for idx, batch in enumerate(train_loader):
+        input_, target = batch
+        if idx == 10:
+            break
