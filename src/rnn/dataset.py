@@ -151,39 +151,43 @@ class MathDataset(Dataset):
         return ''.join(list(map(lambda x: self.idx2token[x], to_decode)))
 
 
-def collate_fn(data):
+def pad_collate(data: Tuple[List[List[int]], List[int], List[int]]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
-       data: is a list of tuples with (example, label, length)
-             where 'example' is a tensor of arbitrary shape
-             and label/length are scalars
+
+    :param data: a tuple (sequences, labels of sequences, lengths of sequences)
+    :return: a padded, tensorized version of the aforementioned tuple
     """
-    _, labels, lengths = zip(*data)
-    max_len = max(lengths)
-    n_ftrs = data[0][0].size(1)
-    features = torch.zeros((len(data), max_len, n_ftrs))
+    # See: https://discuss.pytorch.org/t/how-to-create-batches-of-a-list-of-varying-dimension-tensors/50773/14
+    inputs, labels, lengths = zip(*data)
+    longest_seq_len = max(lengths)
+    padded_inputs = torch.zeros((len(data), longest_seq_len)).long()
     labels = torch.tensor(labels)
     lengths = torch.tensor(lengths)
-
     for i in range(len(data)):
-        j, k = data[i][0].size(0), data[i][0].size(1)
-        features[i] = torch.cat([data[i][0], torch.zeros((max_len - j, k))])
-
-    return features.float(), labels.long(), lengths.long()
-
-
-def custom_collate(data):
-    # https://discuss.pytorch.org/t/how-to-create-batches-of-a-list-of-varying-dimension-tensors/50773/14
-    longest = len(data[-1][0]) + len(data[-1][1])
-    for sample_input, sample_output, length in data:
-        if len(sample_input) + sample_output < longest:
-            pass
-    return data
+        len_seq = len(data[i][0])
+        padded_inputs[i] = torch.cat([torch.tensor(data[i][0]).long(), torch.zeros((longest_seq_len - len_seq)).long()])
+    return padded_inputs.long(), labels.long(), lengths.long()
 
 
 class SortedRandomSampler(RandomSampler):
-    def __init__(self, *args, strict: bool, chunks: int = 100, **kwargs):
-        super(SortedRandomSampler).__init__(*args, **kwargs)
-        self.strict = strict
+    def __init__(self, *args, mode: str = 'strict_shuffle', chunks: int = 100, **kwargs):
+        """
+        A sampler that can take into account that the dataset may be sorted in increasing length order for efficiency
+        purposes when batching.
+        :param args:
+        :param mode: 'strict_shuffle': only sequences of the same length are shuffled. chunks is ignored. Dataset should
+                     be sorted
+                     'non_strict_shuffle': dataset should be sorted. The dataset is chunked into as many chunks as
+                     specified by the chunks parameter, thus minimizing the impact of mixing sequences of different
+                     length
+                     'std_shuffle': dataset is shuffled as in Sampler
+                     'no_shuffle': the dataset is not shuffled
+        :param chunks: ignored if mode != 'non_strict_shuffle'
+        :param kwargs:
+        """
+        super(SortedRandomSampler, self).__init__(*args, **kwargs)
+        self.mode = mode
+        assert self.mode in ['strict_shuffle', 'non_strict_shuffle', 'std_shuffle', 'no_shuffle']
         self.chunks = chunks
         assert self.chunks > 0
 
@@ -191,29 +195,41 @@ class SortedRandomSampler(RandomSampler):
         n = len(self.data_source)
         if self.replacement:
             raise NotImplementedError()
-        if self.strict:
-            length_chunks = self.unique_indexes(dataset.lengths)
-            chunks = []
-            current_chunk = []
-            current_length_idx_idx = 1
-            current_length_idx = length_chunks[current_length_idx_idx]
-            for idx in range(0, n):
-                if idx == current_length_idx:
-                    chunks.append(current_chunk)
-                    current_chunk = []
-                    current_length_idx_idx += 1
-                    current_length_idx = length_chunks[current_length_idx_idx]
-                current_chunk.append(idx)
+        if self.mode in ['strict_shuffle', 'non_strict_shuffle']:
+            if self.mode == 'strict_shuffle':
+                length_chunks = self.unique_indexes(self.data_source.lengths)
+                chunks = []
+                current_chunk = []
+                current_length_idx_idx = 1
+                current_length_idx = length_chunks[current_length_idx_idx]
+                for idx in range(0, n):
+                    if idx == current_length_idx:
+                        chunks.append(current_chunk)
+                        current_chunk = []
+                        current_length_idx_idx += 1
+                        if current_length_idx_idx == len(length_chunks):
+                            break
+                        current_length_idx = length_chunks[current_length_idx_idx]
+                    current_chunk.append(idx)
+            else:
+                chunks = np.array_split(list(range(0, n)), 5)
+            res = []
+            for chunk in chunks:
+                chunk = torch.randperm(chunk[-1]).tolist()
+                res.extend(chunk)
+        elif self.mode == 'std_shuffle':
+            res =  torch.randperm(n).tolist()
         else:
-            chunks = np.array_split(list(range(0, n)), 5)
-        res = []
-        for chunk in chunks:
-            chunk = torch.randperm(chunk[-1]).tolist()
-            res.extend(chunk)
+            res = range(len(self.data_source))
         return iter(res)
 
     @staticmethod
-    def unique_indexes(a: List):
+    def unique_indexes(a: List) -> List[int]:
+        """
+        Returns list with unique indexes
+        :param a: List
+        :return: List with unique indexes
+        """
         res = []
         already_seen = set([])
         for idx, elem in enumerate(a):
@@ -224,29 +240,38 @@ class SortedRandomSampler(RandomSampler):
         return res
 
 
-class VariableSizeDataLoader(DataLoader):
-    def __init__(self, dataset: MathDataset, *args, strict: bool, chunks: int = None, **kwargs):
-        super(VariableSizeDataLoader).__init__(*args, sampler=SortedRandomSampler(dataset, strict, *args, chunks=chunks),
-                                                collate_fn=custom_collate, **kwargs)
+class SortedShufflingDataLoader(DataLoader):
+    def __init__(self, dataset: MathDataset, *args, mode: str = 'strict_shuffle', chunks: int = 100, **kwargs):
+        """
+        Extends the base DataLoader to support variable length sequences. See pad_collate for the used collate function
+        :param dataset: See MathDataset.
+        :param args:
+        :param mode: See SortedRandomSampler
+        :param chunks: See SortedRandomSampler
+        :param kwargs:
+        """
+        super(SortedShufflingDataLoader, self).__init__(dataset, *args, sampler=SortedRandomSampler(dataset, *args,
+                                                        mode=mode, chunks=chunks), collate_fn=pad_collate, **kwargs)
 
 
 if __name__ == '__main__':
+    # Example usage
     print('Train')
-    dataset = MathDataset(path=os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
+    train_dataset = MathDataset(path=os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
                                             'train_easy_true_false_concat_subsampled.txt'),
                           subset='train', sort=False)
-    print(f"first sequence: {(dataset.decode(dataset.X[0]), True if dataset.y[0] == 1 else False)}")
+    print(f"first sequence: {(train_dataset.decode(train_dataset.X[0]), True if train_dataset.y[0] == 1 else False)}")
     print()
-    print(f"Encoded first sequence: {(dataset.X[0], dataset.y[0])}")
+    print(f"Encoded first sequence: {(train_dataset.X[0], train_dataset.y[0])}")
     print()
     print('Without sorting by length (length of first instances)')
-    print(list(map(lambda i: len(i), dataset.X[0:10])))
+    print(list(map(lambda i: len(i), train_dataset.X[0:10])))
     print()
-    dataset.sort_by_lengths()
+    train_dataset.sort_by_lengths()
     print('Having sorted by length (length first instances)')
-    print(list(map(lambda i: len(i), dataset.X[0:10])))
+    print(list(map(lambda i: len(i), train_dataset.X[0:10])))
     print()
-    token2idx, idx2token, unk_token_idx = dataset.get_vocab()
+    token2idx, idx2token, unk_token_idx = train_dataset.get_vocab()
     print(f'token2idx: len: {len(token2idx)}, examples: {list(token2idx[e] for e in idx2token[0:10])}')
     print(f'idx2token: len: {len(idx2token)}, examples: {idx2token[0:10]}')
     print(f'unk_token_idx: {unk_token_idx}, unk_token: {idx2token[unk_token_idx]}')
@@ -256,3 +281,8 @@ if __name__ == '__main__':
                                             'train_easy_true_false_concat_subsampled.txt'),
                           subset='valid', token2idx=token2idx, idx2token=idx2token)
 
+    dataloader = SortedShufflingDataLoader(train_dataset, mode='strict_shuffle', batch_size=3)
+    for batch in dataloader:
+        input_, label, lengths = batch
+        print(input_.shape, label.shape, lengths.shape)
+        break
