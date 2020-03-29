@@ -1,14 +1,19 @@
 from torch.utils.data.dataset import Dataset
 import os
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Union
 from tqdm import tqdm
 import numpy as np
 import torch
+from torch.utils.data import DataLoader, RandomSampler
+import torch
+from math import inf
+
 
 
 class MathDataset(Dataset):
     def __init__(self, path: str, subset: str, token2idx: Dict[str, int] = None, idx2token: List[str] = None,
-                 lower: bool = True, props: Tuple[int] = (98, 1, 1), debug: bool = False):
+                 lower: bool = True, props: Tuple[int] = (98, 1, 1), debug: bool = False,
+                 sort: Union[bool, str] = 'auto'):
         """
 
         :param path: path to the 'train-easy' dataset of Deepmind's Mathematics dataset (v1.0)
@@ -19,7 +24,9 @@ class MathDataset(Dataset):
         :param lower: whether to convert characters to lowercase. By default, True, because characters don't seem to add
         information in this dataset
         :param props: proportions of the train-valid-test split
-        :param debug: load a tinty subset for debugging purpsoes
+        :param debug: load a tinty subset for debugging purposes
+        :param sort: whether to sort the dataset in increasing order. If set to 'auto' (default), it is automatically
+        set to True for train and False for valid and test.
         """
         self.path = path
         self.subset = subset
@@ -30,6 +37,9 @@ class MathDataset(Dataset):
         assert idx2token is None if self.subset == 'train' else len(idx2token) > 0
         assert (token2idx is None and idx2token is None) or len(token2idx) == len(idx2token)
         assert sum(self.props) == 100
+        assert sort in ['auto', True, False]
+        autosort = True if self.subset == 'train' else False
+        self.sort = sort if sort is not 'auto' else autosort
         self.unk_token_idx = 0
         self.unk_token = '<UNK>'
         self.pad_token_idx = 0
@@ -117,10 +127,11 @@ class MathDataset(Dataset):
                 break
         assert len(self.X) == len(self.Y)
         self.data_len = len(self.X)
+        if self.sort:
+            self._sort_by_lengths()
 
-    def __getitem__(self, index: int) -> Tuple[List[int], List[int]]:
-        #return torch.tensor(self.X[index]), torch.tensor(self.Y[index])
-        return self.X[index], self.Y[index]
+    def __getitem__(self, index: int) -> Tuple[List[int], List[int], int]:
+        return self.X[index], self.Y[index], self.lengths[index]
 
     def __len__(self) -> int:
         return self.data_len
@@ -145,7 +156,7 @@ class MathDataset(Dataset):
         self.idx2token.append(c)
         self.token2idx[c] = len(self.idx2token) - 1
 
-    def sort_by_lengths(self):
+    def _sort_by_lengths(self):
         """
         Sorts the dataset in increasing order of total length (X + Y), for efficiency purposes when generating batches
         :return:
@@ -157,6 +168,13 @@ class MathDataset(Dataset):
         self.Y = [self.Y[i] for i in sorted_idx]
         self.sorted = True
 
+    def sort_by_lengths(self):
+        """
+        Public wrapper for sort_by_lengths (typically, for debugging purposes, if sort is set to False)
+        :return:
+        """
+        self._sort_by_lengths()
+
     def encode(self, to_encode: str) -> List[int]:
         return list(map(lambda x: self.token2idx[x], to_encode))
 
@@ -164,10 +182,89 @@ class MathDataset(Dataset):
         return ''.join(list(map(lambda x: self.idx2token[x], to_decode)))
 
 
+def collate_fn(data):
+    """
+       data: is a list of tuples with (example, label, length)
+             where 'example' is a tensor of arbitrary shape
+             and label/length are scalars
+    """
+    _, labels, lengths = zip(*data)
+    max_len = max(lengths)
+    n_ftrs = data[0][0].size(1)
+    features = torch.zeros((len(data), max_len, n_ftrs))
+    labels = torch.tensor(labels)
+    lengths = torch.tensor(lengths)
+
+    for i in range(len(data)):
+        j, k = data[i][0].size(0), data[i][0].size(1)
+        features[i] = torch.cat([data[i][0], torch.zeros((max_len - j, k))])
+
+    return features.float(), labels.long(), lengths.long()
+
+def custom_collate(data):
+    # https://discuss.pytorch.org/t/how-to-create-batches-of-a-list-of-varying-dimension-tensors/50773/14
+    longest = len(data[-1][0]) + len(data[-1][1])
+    for sample_input, sample_output, length in data:
+        if len(sample_input) + sample_output < longest:
+            pass
+    return data
+
+
+class SortedRandomSampler(RandomSampler):
+    def __init__(self, *args, strict: bool, chunks: int = 100, **kwargs):
+        super(SortedRandomSampler).__init__(*args, **kwargs)
+        self.strict = strict
+        self.chunks = chunks
+        assert self.chunks > 0
+
+    def __iter__(self):
+        n = len(self.data_source)
+        if self.replacement:
+            raise NotImplementedError()
+        if self.strict:
+            length_chunks = self.unique_indexes(dataset.lengths)
+            chunks = []
+            current_chunk = []
+            current_length_idx_idx = 1
+            current_length_idx = length_chunks[current_length_idx_idx]
+            for idx in range(0, n):
+                if idx == current_length_idx:
+                    chunks.append(current_chunk)
+                    current_chunk = []
+                    current_length_idx_idx += 1
+                    current_length_idx = length_chunks[current_length_idx_idx]
+                current_chunk.append(idx)
+        else:
+            chunks = np.array_split(list(range(0, n)), 5)
+        res = []
+        for chunk in chunks:
+            chunk = torch.randperm(chunk[-1]).tolist()
+            res.extend(chunk)
+        return iter(res)
+
+    @staticmethod
+    def unique_indexes(a: List):
+        res = []
+        already_seen = set([])
+        for idx, elem in enumerate(a):
+            if elem in already_seen:
+                continue
+            already_seen.add(elem)
+            res.append(idx)
+        return res
+
+
+class VariableSizeDataLoader(DataLoader):
+    def __init__(self, dataset: MathDataset, *args, strict: bool, chunks: int = None, **kwargs):
+        super(VariableSizeDataLoader).__init__(*args,
+                                                sampler=SortedRandomSampler(dataset, strict, *args, chunks=chunks),
+                                                collate_fn=custom_collate, **kwargs)
+
+
 if __name__ == '__main__':
     print('Train')
     dataset = MathDataset(path=os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
-                                            'train-easy'), subset='train', debug=True)
+                                            'train-easy'), subset='train', debug=True, sort=False)
     print(f"first sequence: {(dataset.decode(dataset.X[0]), dataset.decode(dataset.Y[0]))}")
     print()
     print(f"Encoded first sequence: {(dataset.X[0], dataset.Y[0])}")
