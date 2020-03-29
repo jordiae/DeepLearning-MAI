@@ -3,28 +3,25 @@ import os
 from typing import Tuple, List, Dict, Union
 from tqdm import tqdm
 import numpy as np
-import torch
 from torch.utils.data import DataLoader, RandomSampler
 import torch
-from math import inf
-
 
 
 class MathDataset(Dataset):
     def __init__(self, path: str, subset: str, token2idx: Dict[str, int] = None, idx2token: List[str] = None,
-                 lower: bool = True, props: Tuple[int] = (98, 1, 1), debug: bool = False,
+                 lower: bool = True, props: Tuple[int] = (80, 10, 10), debug: bool = False,
                  sort: Union[bool, str] = 'auto'):
         """
 
-        :param path: path to the 'train-easy' dataset of Deepmind's Mathematics dataset (v1.0)
-        We use focus on this subset because of computational and time constraints
+        :param path: path to 'train_easy_true_false_concat_subsampled.txt', our subset from the 'train-easy' dataset of
+        Deepmind's Mathematics dataset (v1.0). We use focus on the Train/False questions because of computational and
+        time constraints
         :param subset: 'train', 'valid' or 'test' (has implications for vocabulary building)
         :param token2idx: Dictionary mapping each character to the corresponding index
         :param idx2token: Inverse of token2idx, ie. list mapping the corresponding index to the original character
         :param lower: whether to convert characters to lowercase. By default, True, because characters don't seem to add
         information in this dataset
         :param props: proportions of the train-valid-test split
-        :param debug: load a tinty subset for debugging purposes
         :param sort: whether to sort the dataset in increasing order. If set to 'auto' (default), it is automatically
         set to True for train and False for valid and test.
         """
@@ -40,21 +37,21 @@ class MathDataset(Dataset):
         assert sort in ['auto', True, False]
         autosort = True if self.subset == 'train' else False
         self.sort = sort if sort is not 'auto' else autosort
-        self.unk_token_idx = 0
+        self.unk_token_idx = 1
         self.unk_token = '<UNK>'
         self.pad_token_idx = 0
         self.pad_token = '<PAD>'
-        self.token2idx = token2idx if token2idx is not None else {self.unk_token: 0, self.pad_token: 1}
-        self.idx2token = idx2token if token2idx is not None else [self.unk_token, self.pad_token]
+        self.token2idx = token2idx if token2idx is not None else {self.pad_token: 0, self.unk_token: 1}
+        self.idx2token = idx2token if token2idx is not None else [self.pad_token, self.unk_token]
         self.proportions = dict(zip(subsets, self.props))
         self.X = []
-        self.Y = []
+        self.y = []
         self.lower = lower
         self.debug = debug
         self.lines_debug = 100000
         self.sorted = False
-        self.answer_token = '<ANSWER>'
         self.eos_token = '<EOS>'
+        self.total_lines = 100000
 
         def check_idx(i: int, sub: str) -> bool:
             """
@@ -65,73 +62,44 @@ class MathDataset(Dataset):
             :param sub: subset
             :return: True if the index belongs to the subset, False otherwise
             """
-            if sub == 'train' and i % 100 < 98:
+            if sub == 'train' and i % 100 < self.proportions['train']:
                 return True
-            if sub == 'valid' and i % 100 == 98:
+            if sub == 'valid' and i % 100 < (self.proportions['train'] + self.proportions['valid']):
                 return True
-            if sub == 'test' and i % 100 == 99:
+            if sub == 'test' and i % 100 >= (self.proportions['train'] + self.proportions['valid']):
                 return True
             return False
 
         self.lengths = []
-        for problem_type in tqdm(os.listdir(path), disable=self.debug):
-            with open(os.path.join(path, problem_type), 'r') as f:
-                idx_x = 0
-                for idx, line in tqdm(enumerate(f.readlines()), disable=not self.debug,
-                                      total=self.lines_debug*(self.proportions[self.subset])//100):
-                    if len(line.split()) == 0:
-                        break
-                    if idx % 2 == 0:
-                        if not check_idx(idx_x, self.subset):
-                            continue
-                        x = []
-                        for c in line:
-                            if c == '\n':
-                                break
-                            c = c.lower() if self.lower and c.isalnum() else c
-                            if subset == 'train':
-                                self.__add_token(c)
-                            else:
-                                if c not in self.token2idx:
-                                    c = self.unk_token
-                            x.append(self.token2idx[c])
-                        if subset == 'train':
-                            self.__add_token(self.answer_token)
-                        x.append(self.token2idx[self.answer_token])
-                        self.X.append(x)
-                        self.lengths.append(len(x))
+        with open(os.path.join(path), 'r') as f:
+            for idx, line in tqdm(enumerate(f.readlines()), total=self.total_lines*self.proportions[self.subset]//100):
+                if not check_idx(idx, self.subset):
+                    continue
+                if len(line.split()) == 0:
+                    break
+                input_ = line[:-7]
+                label = line[-6:].strip()
+                label = 1 if label == 'True' else 0
+                x = []
+                for c in input_:
+                    c = c.lower() if self.lower and c.isalnum() else c
+                    if subset == 'train':
+                        self.__add_token(c)
                     else:
-                        if not check_idx(idx_x, self.subset):
-                            idx_x += 1
-                            continue
-                        y = []
-                        for c in line:
-                            if c == '\n':
-                                break
-                            c = c.lower() if self.lower and c.isalnum() else c
-                            if subset == 'train':
-                                self.__add_token(c)
-                            else:
-                                if c not in self.token2idx:
-                                    c = self.unk_token
-                            y.append(self.token2idx[c])
-                        if subset == 'train':
-                            self.__add_token(self.eos_token)
-                        y.append(self.token2idx[self.eos_token])
-                        self.Y.append(y)
-                        self.lengths[-1] += len(y)
-                        idx_x += 1
-                    if self.debug and idx >= self.lines_debug and len(self.X) == len(self.Y):
-                        break
-            if self.debug:
-                break
-        assert len(self.X) == len(self.Y)
+                        if c not in self.token2idx:
+                            c = self.unk_token
+                    x.append(self.token2idx[c])
+                self.X.append(x)
+                self.y.append(label)
+                self.lengths.append(len(x))
+
+        assert len(self.X) == len(self.y)
         self.data_len = len(self.X)
         if self.sort:
             self._sort_by_lengths()
 
-    def __getitem__(self, index: int) -> Tuple[List[int], List[int], int]:
-        return self.X[index], self.Y[index], self.lengths[index]
+    def __getitem__(self, index: int) -> Tuple[List[int], int, int]:
+        return self.X[index], self.y[index], self.lengths[index]
 
     def __len__(self) -> int:
         return self.data_len
@@ -150,7 +118,7 @@ class MathDataset(Dataset):
         :return:
         """
         assert self.subset == 'train'
-        assert len(c) == 1 or c == self.eos_token or c == self.answer_token
+        assert len(c) == 1 or c == self.eos_token
         if c in self.token2idx:
             return
         self.idx2token.append(c)
@@ -165,7 +133,8 @@ class MathDataset(Dataset):
         assert not self.sorted
         sorted_idx = np.argsort(self.lengths)
         self.X = [self.X[i] for i in sorted_idx]
-        self.Y = [self.Y[i] for i in sorted_idx]
+        self.y = [self.y[i] for i in sorted_idx]
+        self.lengths = [self.lengths[i] for i in sorted_idx]
         self.sorted = True
 
     def sort_by_lengths(self):
@@ -200,6 +169,7 @@ def collate_fn(data):
         features[i] = torch.cat([data[i][0], torch.zeros((max_len - j, k))])
 
     return features.float(), labels.long(), lengths.long()
+
 
 def custom_collate(data):
     # https://discuss.pytorch.org/t/how-to-create-batches-of-a-list-of-varying-dimension-tensors/50773/14
@@ -256,25 +226,25 @@ class SortedRandomSampler(RandomSampler):
 
 class VariableSizeDataLoader(DataLoader):
     def __init__(self, dataset: MathDataset, *args, strict: bool, chunks: int = None, **kwargs):
-        super(VariableSizeDataLoader).__init__(*args,
-                                                sampler=SortedRandomSampler(dataset, strict, *args, chunks=chunks),
+        super(VariableSizeDataLoader).__init__(*args, sampler=SortedRandomSampler(dataset, strict, *args, chunks=chunks),
                                                 collate_fn=custom_collate, **kwargs)
 
 
 if __name__ == '__main__':
     print('Train')
     dataset = MathDataset(path=os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
-                                            'train-easy'), subset='train', debug=True, sort=False)
-    print(f"first sequence: {(dataset.decode(dataset.X[0]), dataset.decode(dataset.Y[0]))}")
+                                            'train_easy_true_false_concat_subsampled.txt'),
+                          subset='train', sort=False)
+    print(f"first sequence: {(dataset.decode(dataset.X[0]), True if dataset.y[0] == 1 else False)}")
     print()
-    print(f"Encoded first sequence: {(dataset.X[0], dataset.Y[0])}")
+    print(f"Encoded first sequence: {(dataset.X[0], dataset.y[0])}")
     print()
     print('Without sorting by length (length of first instances)')
-    print(list(map(lambda i: len(i[0]) + len(i[1]), zip(dataset.X[0:10], dataset.Y[0:10]))))
+    print(list(map(lambda i: len(i), dataset.X[0:10])))
     print()
     dataset.sort_by_lengths()
     print('Having sorted by length (length first instances)')
-    print(list(map(lambda i: len(i[0]) + len(i[1]), zip(dataset.X[0:10], dataset.Y[0:10]))))
+    print(list(map(lambda i: len(i), dataset.X[0:10])))
     print()
     token2idx, idx2token, unk_token_idx = dataset.get_vocab()
     print(f'token2idx: len: {len(token2idx)}, examples: {list(token2idx[e] for e in idx2token[0:10])}')
@@ -283,26 +253,6 @@ if __name__ == '__main__':
     print()
     print('Valid')
     dataset = MathDataset(path=os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
-                                            'train-easy'), subset='valid', debug=True, token2idx=token2idx,
-                          idx2token=idx2token)
+                                            'train_easy_true_false_concat_subsampled.txt'),
+                          subset='valid', token2idx=token2idx, idx2token=idx2token)
 
-    # TODO: padding
-
-    from torch.utils.data import DataLoader
-    from math import inf
-
-    def custom_collate(data):
-        pad = 0
-        # https://discuss.pytorch.org/t/how-to-create-batches-of-a-list-of-varying-dimension-tensors/50773/14
-        # assuming longest sequence is the last one
-        longest = len(batch[-1][0]) + len(batch[-1][1])
-        for sample_input, sample_output in batch:
-            if len(sample_input) + sample_output < longest:
-                pass
-        return input_, target
-    # sampler: https://github.com/pytorch/pytorch/blob/master/torch/utils/data/dataloader.py
-    train_loader = DataLoader(dataset, batch_size=10, shuffle=True, collate_fn=custom_collate, sampler=None)
-    for idx, batch in enumerate(train_loader):
-        input_, target = batch
-        if idx == 10:
-            break
