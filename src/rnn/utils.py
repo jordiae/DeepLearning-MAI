@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from torch import nn
 
 
-
 def dir_path(s):
     if os.path.isdir(s):
         return s
@@ -24,7 +23,8 @@ class LabelSmoothingLoss(nn.Module):
         super(LabelSmoothingLoss, self).__init__()
         self.smoothing = smoothing
 
-    def smooth_one_hot(self, target, classes, smoothing=0.0):
+    @staticmethod
+    def smooth_one_hot(target, classes, smoothing=0.0):
         assert 0 <= smoothing < 1
         shape = (target.size(0), classes)
         with torch.no_grad():
@@ -34,9 +34,9 @@ class LabelSmoothingLoss(nn.Module):
 
         return target
 
-    def forward(self, input, target):
-        target = LabelSmoothingLoss.smooth_one_hot(self, target, input.size(-1), self.smoothing)
-        lsm = F.log_softmax(input, -1)
+    def forward(self, input_, target):
+        target = LabelSmoothingLoss.smooth_one_hot(target, input_.size(-1), self.smoothing)
+        lsm = F.log_softmax(input_, -1)
         loss = -(target * lsm).sum(-1)
         loss = loss.mean()
 
