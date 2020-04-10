@@ -16,7 +16,7 @@ class BinaryClassifier(nn.Module):
 
     def forward(self, x):
         x = self.linear(x)
-        x = F.sigmoid(self.linear(x))
+        x = torch.sigmoid(x)
         return x
 
 
