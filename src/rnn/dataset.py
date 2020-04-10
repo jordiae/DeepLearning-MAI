@@ -155,7 +155,7 @@ def pad_collate(data: Tuple[List[List[int]], List[int], List[int]]) -> Tuple[tor
     """
 
     :param data: a tuple (sequences, labels of sequences, lengths of sequences)
-    :return: a right-padded, tensorized version of the aforementioned tuple
+    :return: a rightben -padded, tensorized version of the aforementioned tuple
     """
     # See: https://discuss.pytorch.org/t/how-to-create-batches-of-a-list-of-varying-dimension-tensors/50773/14
     inputs, labels, lengths = zip(*data)
@@ -246,14 +246,16 @@ class SortedShufflingDataLoader(DataLoader):
         :param kwargs:
         """
         super(SortedShufflingDataLoader, self).__init__(dataset, *args, sampler=SortedRandomSampler(dataset, *args,
-                                                                                                    mode=mode, n_chunks=chunks), collate_fn=pad_collate, **kwargs)
+                                                                                                    mode=mode,
+                                                                                                    n_chunks=chunks),
+                                                        collate_fn=pad_collate, **kwargs)
 
 
 if __name__ == '__main__':
     # Example usage
     print('Train')
     train_dataset = MathDataset(path=os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
-                                            'train_easy_true_false_concat_subsampled.txt'),
+                                                  'train_easy_true_false_concat_subsampled.txt'),
                           subset='train', sort=False)
     print(f"first sequence: {(train_dataset.decode(train_dataset.X[0]), True if train_dataset.y[0] == 1 else False)}")
     print()
