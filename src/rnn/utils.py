@@ -32,7 +32,7 @@ def pack_right_padded_seq(seqs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tenso
     :param seqs: [batch, right-padded tokens]
     :return: ([packed tokens], [effective batch sizes])
     """
-    effective_batch_sizes = (seqs != 0).sum(dim=1)
+    effective_batch_sizes = (seqs != 0).sum(dim=0)
     seqs = torch.cat((seqs, torch.zeros(seqs.shape[0], 1).long()), dim=-1)
     seqs = seqs.permute(-1, 0).reshape(seqs.shape[0] * seqs.shape[1])  # [batch, tokens] -> [batch*tokens]
     non_pad_idx = (seqs != 0).nonzero().flatten()
