@@ -47,7 +47,7 @@ class VanillaRNN(BaseRNN):
         for i in range(1, self.n_layers):
             if self.dropout > 0:
                 layers.append(nn.Dropout(self.dropout))
-            layers.append(VanillaRNNLayer(self.input_features, self.hidden_features, self.activation, mode=self.mode))
+            layers.append(VanillaRNNLayer(self.hidden_features, self.hidden_features, self.activation, mode=self.mode))
         layers = nn.ModuleList(layers)
         return layers
 
