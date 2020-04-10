@@ -7,7 +7,7 @@ class VanillaRNNLayer(BaseRNNLayer):
     def __init__(self, *args, mode: str = 'jordan', **kwargs):
         """ Vanilla RNN layer. Unlike torch.nn's implementation, it supports both Jordan and Elman RNN layers
         :param mode: either Jordan or Elman"""
-        super(VanillaRNNLayer).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         assert mode in ['elman', 'jordan']
         self.mode = mode
         self.b = nn.Parameter(torch.Tensor(self.hidden_features), requires_grad=True)
@@ -36,17 +36,17 @@ class VanillaRNN(BaseRNN):
     def __init__(self, *args, mode: str = 'jordan', **kwargs):
         """ Vanilla RNN layer. Unlike torch.nn's implementation, it supports both Jordan and Elman RNN layers.
         :param mode: either Jordan or Elman"""
-        super(VanillaRNN).__init__(*args, **kwargs)
         assert mode in ['elman', 'jordan']
         self.mode = mode
+        super().__init__(*args, **kwargs)
 
     def _init_layers(self) -> torch.nn.ModuleList:
         """Stack of vanilla RNN layers"""
-        initial_layer = VanillaRNNLayer(self.input_features, self.hidden_features, self.mode, self.activation)
+        initial_layer = VanillaRNNLayer(self.input_features, self.hidden_features, self.activation, mode=self.mode)
         layers = [initial_layer]
         for i in range(1, self.n_layers):
             if self.dropout > 0:
                 layers.append(nn.Dropout(self.dropout))
-            layers.append(VanillaRNNLayer(self.input_features, self.hidden_features, self.mode, self.activation))
+            layers.append(VanillaRNNLayer(self.input_features, self.hidden_features, self.activation, mode=self.mode))
         layers = nn.ModuleList(layers)
         return layers
