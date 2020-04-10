@@ -170,7 +170,7 @@ def pad_collate(data: Tuple[List[List[int]], List[int], List[int]]) -> Tuple[tor
 
 
 class SortedRandomSampler(RandomSampler):
-    def __init__(self, *args, mode: str = 'strict_shuffle', chunks: int = 100, **kwargs):
+    def __init__(self, *args, mode: str = 'strict_shuffle', n_chunks: int = 100, **kwargs):
         """
         A sampler that can take into account that the dataset may be sorted in increasing length order for efficiency
         purposes when batching.
@@ -182,45 +182,40 @@ class SortedRandomSampler(RandomSampler):
                      length
                      'std_shuffle': dataset is shuffled as in Sampler
                      'no_shuffle': the dataset is not shuffled
-        :param chunks: ignored if mode != 'non_strict_shuffle'
+        :param n_chunks: ignored if mode != 'non_strict_shuffle'
         :param kwargs:
         """
         super(SortedRandomSampler, self).__init__(*args, **kwargs)
         self.mode = mode
         assert self.mode in ['strict_shuffle', 'non_strict_shuffle', 'std_shuffle', 'no_shuffle']
-        self.chunks = chunks
-        assert self.chunks > 0
+        self.n_chunks = n_chunks
+        assert self.n_chunks > 0
 
     def __iter__(self):
         n = len(self.data_source)
         if self.replacement:
             raise NotImplementedError()
+
         if self.mode in ['strict_shuffle', 'non_strict_shuffle']:
             if self.mode == 'strict_shuffle':
                 length_chunks = self.unique_indexes(self.data_source.lengths)
-                chunks = []
-                current_chunk = []
-                current_length_idx_idx = 1
-                current_length_idx = length_chunks[current_length_idx_idx]
-                for idx in range(0, n):
-                    if idx == current_length_idx:
-                        chunks.append(current_chunk)
-                        current_chunk = []
-                        current_length_idx_idx += 1
-                        if current_length_idx_idx == len(length_chunks):
-                            break
-                        current_length_idx = length_chunks[current_length_idx_idx]
-                    current_chunk.append(idx)
+                length_chunks.append(n)
             else:
-                chunks = np.array_split(list(range(0, n)), 5)
+                length_chunks = list(range(0, n+1, int(n/self.n_chunks)))
             res = []
-            for chunk in chunks:
-                chunk = torch.randperm(chunk[-1]).tolist()
-                res.extend(chunk)
+            chunk_start = length_chunks[0]
+            for i in range(1, len(length_chunks)):
+                chunk_end = length_chunks[i]-1
+                rand_ind = torch.randperm(chunk_end-chunk_start+1)
+                res.extend([chunk_start + index for index in rand_ind])
+                chunk_start = chunk_end+1
+
         elif self.mode == 'std_shuffle':
-            res =  torch.randperm(n).tolist()
+            res = torch.randperm(n).tolist()
+
         else:
             res = range(len(self.data_source))
+
         return iter(res)
 
     @staticmethod
@@ -251,7 +246,7 @@ class SortedShufflingDataLoader(DataLoader):
         :param kwargs:
         """
         super(SortedShufflingDataLoader, self).__init__(dataset, *args, sampler=SortedRandomSampler(dataset, *args,
-                                                        mode=mode, chunks=chunks), collate_fn=pad_collate, **kwargs)
+                                                                                                    mode=mode, n_chunks=chunks), collate_fn=pad_collate, **kwargs)
 
 
 if __name__ == '__main__':
