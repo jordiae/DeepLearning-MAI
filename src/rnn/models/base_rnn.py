@@ -97,13 +97,14 @@ class BaseRNN(nn.Module):
         layers. """
         raise NotImplementedError()
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, lengths: torch.Tensor) -> torch.Tensor:
         """
         :param x: [batch, seq_len, (right-padded) tokens]
+        :param lengths: [batch]
         :return: [batch, 1]
         """
         bs = x.shape[0]
-        x, effective_batch_sizes = pack_right_padded_seq(x)
+        x, effective_batch_sizes = pack_right_padded_seq(x, lengths)
 
         x = self.embedding(x)
 

@@ -32,9 +32,9 @@ def evaluate(data_loader: SortedShufflingDataLoader, model: torch.nn.Module, dev
     y_output = []
     y_ground_truth = []
     with torch.no_grad():
-        for data, target, lenghts in data_loader:
+        for data, target, lengths in data_loader:
             data, target = data.to(device), target.to(device)
-            output = model(data)
+            output = model(data, lengths)
             avg_loss += F.binary_cross_entropy(output, target, reduction='sum').item()  # sum batch loss
             pred = output.argmax(dim=1, keepdim=True)  # index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
@@ -53,10 +53,10 @@ def evaluate_ensemble(data_loader: SortedShufflingDataLoader, models: List[torch
     y_output = []
     y_ground_truth = []
     with torch.no_grad():
-        for data, target, lenghts in data_loader:
+        for data, target, lengths in data_loader:
             data, target = data.to(device), target.to(device)
             models[0].eval()
-            output = models[0](data)
+            output = models[0](data, lengths)
             for model in models[1:]:
                 model.eval()
                 output += model(data)
@@ -106,7 +106,7 @@ if __name__ == '__main__':
         models.append(model)
 
     dataset = MathDataset(path=data_path, subset=args.subset, token2idx=token2idx,
-                          idx2token=idx2token)
+                          idx2token=idx2token, sort=True)
     data_loader = SortedShufflingDataLoader(dataset, mode='no_shuffle', batch_size=train_args.batch_size)
 
     if len(models) == 1:

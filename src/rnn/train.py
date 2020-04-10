@@ -29,9 +29,9 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
         for idx, data in enumerate(train_loader):
             if (idx+1) % 10 == 0:
                 logging.info(f'{idx+1}/{len(train_loader)} batches')
-            inputs, labels = data[0].to(device), data[1].to(device)
+            inputs, labels, lengths = data[0].to(device), data[1].to(device), data[2].to(device)
             optimizer.zero_grad()
-            outputs = model(inputs)
+            outputs = model(inputs, lengths)
             total += labels.size(0)
             predicted = torch.round(outputs.data)
             labels = labels.unsqueeze(1).float()
@@ -52,8 +52,8 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
         model.eval()
         with torch.no_grad():
             for data in valid_loader:
-                inputs, labels = data[0].to(device), data[1].to(device)
-                outputs = model(inputs)
+                inputs, labels, lengths = data[0].to(device), data[1].to(device), data[2].to(device)
+                outputs = model(inputs, lengths)
                 labels = labels.unsqueeze(1).float()
                 loss = criterion(outputs, labels)
                 loss_val += loss
