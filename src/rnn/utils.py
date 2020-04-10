@@ -2,6 +2,7 @@ import os
 import torch
 import torch.nn.functional as F
 from torch import nn
+from typing import Tuple
 
 
 def dir_path(s):
@@ -41,3 +42,22 @@ class LabelSmoothingLoss(nn.Module):
         loss = loss.mean()
 
         return loss
+
+
+def pack_right_padded_seq(seqs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Function for packing a right-padded sequence, imitating the functionality of torch.nn.utils.rnn.pad_sequence.
+    The function flattens all sequences into a single sequence, ordered by time-step ([first token of first batch,
+    first token of second batch,... last token of last batch] and removes padding. It also returns the effective batch
+    size at each iteration, which will be [number of first tokens across batch, number of second tokens...]
+    :param seqs: [batch, right-padded tokens]
+    :return: ([packed tokens], [effective batch sizes])
+    """
+
+    seqs = seqs.permute(-1, 0).reshape(seqs.shape[0] * seqs.shape[1])  # [batch, tokens] -> [batch*tokens]
+    pad_idx = (seqs == 0).nonzero().flatten()
+    non_pad_idx = (seqs != 0).nonzero().flatten()
+    seqs = seqs[non_pad_idx]
+    effective_batch_sizes = pad_idx
+    return seqs, effective_batch_sizes
+
