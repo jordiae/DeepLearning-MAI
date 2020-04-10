@@ -155,7 +155,7 @@ def pad_collate(data: Tuple[List[List[int]], List[int], List[int]]) -> Tuple[tor
     """
 
     :param data: a tuple (sequences, labels of sequences, lengths of sequences)
-    :return: a rightben -padded, tensorized version of the aforementioned tuple
+    :return: a right-padded, tensorized version of the aforementioned tuple
     """
     # See: https://discuss.pytorch.org/t/how-to-create-batches-of-a-list-of-varying-dimension-tensors/50773/14
     inputs, labels, lengths = zip(*data)
