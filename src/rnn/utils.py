@@ -1,4 +1,3 @@
-from rnn.models import *
 import torch
 from typing import Tuple
 import argparse
@@ -7,6 +6,7 @@ import logging
 
 
 def load_arch(args: argparse.Namespace) -> torch.nn.Module:
+    from rnn.models import VanillaRNN, AlbertRNN
     if args.arch == 'elman':
         model = VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size, hidden_features=args.hidden_size,
                            n_layers=args.n_layers, mode='elman')
