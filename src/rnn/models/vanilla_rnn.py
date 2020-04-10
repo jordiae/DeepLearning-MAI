@@ -54,6 +54,6 @@ class VanillaRNN(BaseRNN):
 
 if __name__ == '__main__':
     net = VanillaRNN(100, 64, 128, 3)
-    x = torch.tensor([[2,3], [4,5]])
+    x = torch.tensor([[2, 3], [4, 5]])
     y = net(x)
     print(y)
