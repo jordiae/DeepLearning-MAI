@@ -121,6 +121,7 @@ class BaseRNN(nn.Module):
                 effective_batch = layer(effective_batch, hidden[idx])
                 hidden[:, idx] = effective_batch
             done_batches += effective_batch_size
+        print()
         x = hidden[:, -1]
 
         if self.bidirectional:
