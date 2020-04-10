@@ -123,7 +123,7 @@ def main():
     args.token2idx = token2idx
     args.idx2token = idx2token
     args.unk_token_idx = unk_token_idx
-    valid_dataset = MathDataset(path=data_path, subset='valid', token2idx=token2idx, idx2token=idx2token)
+    valid_dataset = MathDataset(path=data_path, subset='valid', sort=True, token2idx=token2idx, idx2token=idx2token)
     train_loader = SortedShufflingDataLoader(train_dataset, mode='strict_shuffle', batch_size=args.batch_size)
     valid_loader = SortedShufflingDataLoader(valid_dataset, mode='no_shuffle', batch_size=args.batch_size)
 
