@@ -9,8 +9,8 @@ import torch
 
 class MathDataset(Dataset):
     def __init__(self, path: str, subset: str, token2idx: Dict[str, int] = None, idx2token: List[str] = None,
-                 lower: bool = True, props: Tuple[int] = (80, 10, 10), debug: bool = False,
-                 sort: Union[bool, str] = 'auto'):
+                 lower: bool = True, props: Tuple[int] = (80, 10, 10), problem_types: List[str] = None,
+                 sort: Union[bool, str] = 'auto', total_lines: int = 100000):
         """
 
         :param path: path to 'train_easy_true_false_concat_subsampled.txt', our subset from the 'train-easy' dataset of
@@ -45,13 +45,13 @@ class MathDataset(Dataset):
         self.idx2token = idx2token if token2idx is not None else [self.pad_token, self.unk_token]
         self.proportions = dict(zip(subsets, self.props))
         self.X = []
-        self.y = []
+        self.Y = []
         self.lower = lower
-        self.debug = debug
-        self.lines_debug = 100000
         self.sorted = False
+        self.answer_token = '<ANSWER>'
         self.eos_token = '<EOS>'
-        self.total_lines = 100000
+        self.problem_types = problem_types if problem_types is not None else os.listdir(path)
+        self.n_lines_problem = int(total_lines / len(self.problem_types))
 
         def check_idx(i: int, sub: str) -> bool:
             """
@@ -71,35 +71,62 @@ class MathDataset(Dataset):
             return False
 
         self.lengths = []
-        with open(os.path.join(path), 'r') as f:
-            for idx, line in tqdm(enumerate(f.readlines()), total=self.total_lines*self.proportions[self.subset]//100):
-                if not check_idx(idx, self.subset):
-                    continue
-                if len(line.split()) == 0:
-                    break
-                input_ = line[:-7]
-                label = line[-6:].strip()
-                label = 1 if label == 'True' else 0
-                x = []
-                for c in input_:
-                    c = c.lower() if self.lower and c.isalnum() else c
-                    if subset == 'train':
-                        self.__add_token(c)
+        self.tgt_tokens_lengths = []
+        for prob_id, problem_type in tqdm(enumerate(self.problem_types), total=len(self.problem_types)):
+            with open(os.path.join(path, problem_type), 'r') as f:
+                idx_x = 0
+                read_lines = (self.n_lines_problem * (self.proportions[self.subset])//100)
+                for idx, line in enumerate(f.readlines()):
+                    if len(line.split()) == 0 or len(self.Y) >= (prob_id+1)*read_lines:
+                        break
+                    if idx % 2 == 0:
+                        if not check_idx(idx_x, self.subset):
+                            continue
+                        x = []
+                        for c in line:
+                            if c == '\n':
+                                break
+                            c = c.lower() if self.lower and c.isalnum() else c
+                            if subset == 'train':
+                                self.__add_token(c)
+                            else:
+                                if c not in self.token2idx:
+                                    c = self.unk_token
+                            x.append(self.token2idx[c])
+                        if subset == 'train':
+                            self.__add_token(self.answer_token)
+                        x.append(self.token2idx[self.answer_token])
+                        self.X.append(x)
+                        self.lengths.append(len(x))
                     else:
-                        if c not in self.token2idx:
-                            c = self.unk_token
-                    x.append(self.token2idx[c])
-                self.X.append(x)
-                self.y.append(label)
-                self.lengths.append(len(x))
-
-        assert len(self.X) == len(self.y)
+                        if not check_idx(idx_x, self.subset):
+                            idx_x += 1
+                            continue
+                        y = []
+                        for c in line:
+                            if c == '\n':
+                                break
+                            c = c.lower() if self.lower and c.isalnum() else c
+                            if subset == 'train':
+                                self.__add_token(c)
+                            else:
+                                if c not in self.token2idx:
+                                    c = self.unk_token
+                            y.append(self.token2idx[c])
+                        if subset == 'train':
+                            self.__add_token(self.eos_token)
+                        y.append(self.token2idx[self.eos_token])
+                        self.Y.append(y)
+                        self.tgt_tokens_lengths.append(len(y))
+                        self.lengths[-1] += len(y)
+                        idx_x += 1
+        assert len(self.X) == len(self.Y)
         self.data_len = len(self.X)
         if self.sort:
             self._sort_by_lengths()
 
-    def __getitem__(self, index: int) -> Tuple[List[int], int, int]:
-        return self.X[index], self.y[index], self.lengths[index]
+    def __getitem__(self, index: int) -> Tuple[List[int], List[int], int, int]:
+        return self.X[index], self.Y[index], self.lengths[index], self.tgt_tokens_lengths[index]
 
     def __len__(self) -> int:
         return self.data_len
@@ -118,7 +145,7 @@ class MathDataset(Dataset):
         :return:
         """
         assert self.subset == 'train'
-        assert len(c) == 1 or c == self.eos_token
+        assert len(c) == 1 or c == self.eos_token or c == self.answer_token
         if c in self.token2idx:
             return
         self.idx2token.append(c)
@@ -133,8 +160,9 @@ class MathDataset(Dataset):
         assert not self.sorted
         sorted_idx = np.argsort(self.lengths)
         self.X = [self.X[i] for i in sorted_idx]
-        self.y = [self.y[i] for i in sorted_idx]
+        self.Y = [self.Y[i] for i in sorted_idx]
         self.lengths = [self.lengths[i] for i in sorted_idx]
+        self.tgt_tokens_lengths = [self.tgt_tokens_lengths[i] for i in sorted_idx]
         self.sorted = True
 
     def sort_by_lengths(self):
@@ -151,22 +179,26 @@ class MathDataset(Dataset):
         return ''.join(list(map(lambda x: self.idx2token[x], to_decode)))
 
 
-def pad_collate(data: Tuple[List[List[int]], List[int], List[int]]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def pad_collate(data: Tuple[List[List[int]], List[List[int]], List[int], List[int]]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
 
-    :param data: a tuple (sequences, labels of sequences, lengths of sequences)
+    :param data: a tuple (sequences, labels of sequences, lengths of sequences, lengths of labels)
     :return: a right-padded, tensorized version of the aforementioned tuple
     """
     # See: https://discuss.pytorch.org/t/how-to-create-batches-of-a-list-of-varying-dimension-tensors/50773/14
-    inputs, labels, lengths = zip(*data)
+    inputs, tgt_tokens, lengths, tgt_tokens_lengths = zip(*data)
     longest_seq_len = max(lengths)
     padded_inputs = torch.zeros((len(data), longest_seq_len)).long()
-    labels = torch.tensor(labels)
+    longest_tgt_len = max(tgt_tokens_lengths)
+    padded_tgt_tokens = torch.zeros((len(data), longest_tgt_len)).long()
     lengths = torch.tensor(lengths)
+    tgt_tokens_lengths = torch.tensor(tgt_tokens_lengths)
     for i in range(len(data)):
         len_seq = len(data[i][0])
         padded_inputs[i] = torch.cat([torch.tensor(data[i][0]).long(), torch.zeros((longest_seq_len - len_seq)).long()])
-    return padded_inputs.long(), labels.long(), lengths.long()
+        len_tgt = len(data[i][1])
+        padded_tgt_tokens[i] = torch.cat([torch.tensor(data[i][1]).long(), torch.zeros((longest_tgt_len - len_tgt)).long()])
+    return padded_inputs.long(), padded_tgt_tokens.long(), lengths.long(), tgt_tokens_lengths.long()
 
 
 class SortedRandomSampler(RandomSampler):
@@ -254,17 +286,13 @@ class SortedShufflingDataLoader(DataLoader):
 if __name__ == '__main__':
     # Example usage
     print('Train')
-    train_dataset = MathDataset(path=os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
-                                                  'train_easy_true_false_concat_subsampled.txt'),
-                          subset='train', sort=False)
-    print(f"first sequence: {(train_dataset.decode(train_dataset.X[0]), True if train_dataset.y[0] == 1 else False)}")
+    data_path = os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
+                             'train-easy')
+    train_dataset = MathDataset(path=data_path, subset='train', sort=True)
+    print(f"first sequence: {(train_dataset.decode(train_dataset.X[0]), train_dataset.decode(train_dataset.Y[0]))}")
     print()
-    print(f"Encoded first sequence: {(train_dataset.X[0], train_dataset.y[0])}")
+    print(f"Encoded first sequence: {(train_dataset.X[0], train_dataset.Y[0])}")
     print()
-    print('Without sorting by length (length of first instances)')
-    print(list(map(lambda i: len(i), train_dataset.X[0:10])))
-    print()
-    train_dataset.sort_by_lengths()
     print('Having sorted by length (length first instances)')
     print(list(map(lambda i: len(i), train_dataset.X[0:10])))
     print()
@@ -274,12 +302,10 @@ if __name__ == '__main__':
     print(f'unk_token_idx: {unk_token_idx}, unk_token: {idx2token[unk_token_idx]}')
     print()
     print('Valid')
-    dataset = MathDataset(path=os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
-                                            'train_easy_true_false_concat_subsampled.txt'),
-                          subset='valid', token2idx=token2idx, idx2token=idx2token)
+    valid_dataset = MathDataset(path=data_path, subset='valid', token2idx=token2idx, idx2token=idx2token)
 
-    dataloader = SortedShufflingDataLoader(train_dataset, mode='strict_shuffle', batch_size=3)
+    dataloader = SortedShufflingDataLoader(train_dataset, mode='strict_shuffle', batch_size=10)
     for batch in dataloader:
-        input_, label, lengths = batch
-        print(input_.shape, label.shape, lengths.shape)
+        input_, tgt_tokens, lengths, tgt_tokens_lengths = batch
+        print(input_.shape, tgt_tokens.shape, lengths.shape, tgt_tokens_lengths.shape)
         break
