@@ -9,7 +9,6 @@ import json
 from torch.utils.tensorboard import SummaryWriter
 from rnn.evaluate import prettify_eval, evaluate
 from src.rnn.utils import load_arch
-from rnn.models import *
 
 
 def train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging, resume_info):
@@ -81,17 +80,17 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
         with open('resume_info.json', 'w') as f:
             json.dump(resume_info, f, indent=2)
 
-    model = load_arch(args)
+    model = load_arch(None, args, logging)
     model.load_state_dict(torch.load('checkpoint_best.pt'))
     model.to(device)
     eval_res = evaluate(valid_loader, model, device)
     logging.info(prettify_eval('train', *eval_res))
 
+
 def main():
     # Settings
     parser = argparse.ArgumentParser(description="Train a RNN for Deepmind's Mathematics Dataset")
-    parser.add_argument('--arch', type=str, help='Architecture', default='AlbertRNN')
-    #parser.add_argument('--data', type=str, help='Dataset', default='train-easy')
+    parser.add_argument('--arch', type=str, help='Architecture', default='ElmanRNN')
     parser.add_argument('--epochs', type=int, help='Number of epochs', default=100)
     parser.add_argument('--lr', type=float, help='Learning Rate', default=0.001)
     parser.add_argument('--momentum', type=float, help='Momentum', default=0.9)
@@ -101,10 +100,14 @@ def main():
     parser.add_argument('--criterion', type=str, help='Criterion', default='bce')
     parser.add_argument('--smooth-criterion', type=float, help='Smoothness for label-smoothing', default=0.1)
     parser.add_argument('--early-stop', type=int,
-                        help='Patience in early stop in validation set (-1 -> no early stop)', default=6)
+                        help='Patience in early stop in validation set (-1 -> no early stop)', default=5)
     parser.add_argument('--weight-decay', type=float, help='Weight decay', default=0.001)
 
-    parser.add_argument('--dropout', type=float, help='Dropout in FC layers', default=0.25)
+    parser.add_argument('--dropout', type=float, help='Dropout in RNN and FC layers', default=0.25)
+    parser.add_argument('--embedding-size', type=int, help='Embedding size', default=64)
+    parser.add_argument('--hidden-size', type=int, help='Hidden state size', default=128)
+    parser.add_argument('--n-layers', type=int, help='Number of recurrent layers', default=1)
+    parser.add_argument('--bidrectional', action='store_true', help='Use bidirectional RNNs')
     args = parser.parse_args()
 
     # Logger
@@ -117,30 +120,20 @@ def main():
 
     # Load train and validation datasets
     logging.info('===> Loading datasets')
-    #data_path = os.path.join('..', '..', 'data', 'mathematics', args.data)
-    train_dataset = MathDataset(path=os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
-                                                  'train_easy_true_false_concat_subsampled.txt'),
-                                subset='train', sort=False)
-    train_dataset.sort_by_lengths()
+    data_path = os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
+                             'train_easy_true_false_concat_subsampled.txt')
+    train_dataset = MathDataset(path=data_path, subset='train', sort=True)
     token2idx, idx2token, unk_token_idx = train_dataset.get_vocab()
     vocab_size = len(token2idx)
-    valid_dataset = MathDataset(path=os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
-                                                  'train_easy_true_false_concat_subsampled.txt'),
-                                subset='valid', token2idx=token2idx, idx2token=idx2token)
+    valid_dataset = MathDataset(path=data_path, subset='valid', token2idx=token2idx, idx2token=idx2token)
     train_loader = SortedShufflingDataLoader(train_dataset, mode='strict_shuffle', batch_size=args.batch_size)
-    valid_loader = SortedShufflingDataLoader(valid_dataset, mode='strict_shuffle', batch_size=args.batch_size)
+    valid_loader = SortedShufflingDataLoader(valid_dataset, mode='no_shuffle', batch_size=args.batch_size)
 
     # Model
     logging.info('===> Building model')
     logging.info(args)
 
-    if args.arch == 'BaseRNN':
-        model = BaseRNN(vocab_size=vocab_size, embedding_size=64, output_size=1, hidden_dim=12, n_layers=1)
-    elif args.arch == 'AlbertRNN':
-        model = AlbertRNN(vocab_size=vocab_size, embed_size=64, num_output=1, rnn_model='LSTM', use_last=True, hidden_size=64, num_layers=1)
-    else:
-        logging.error("Architecture not implemented")
-        raise NotImplementedError()
+    model = load_arch(vocab_size, args, logging)
 
     resume_info = dict(epoch=0, best_valid_metric=0.0, epochs_without_improvement=0)
 
@@ -153,9 +146,7 @@ def main():
         raise NotImplementedError()
 
     if args.criterion == 'bce':
-        criterion = nn.BCEWithLogitsLoss()
-    elif args.criterion == 'mse':
-        criterion = nn.MSELoss()
+        criterion = nn.BCELoss()
     else:
         logging.error("Criterion not implemented")
         raise NotImplementedError()
@@ -165,6 +156,7 @@ def main():
 
     logging.info('===> Training')
     train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging, resume_info)
+
 
 if __name__ == '__main__':
     main()

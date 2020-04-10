@@ -1,47 +1,29 @@
-import os
+from rnn.models import *
 import torch
-import torch.nn.functional as F
-from torch import nn
 from typing import Tuple
+import argparse
+import logging
+from typing import Union
 
 
-def dir_path(s):
-    if os.path.isdir(s):
-        return s
+def load_arch(vocab_size: Union[int, None], args: argparse.Namespace, log: logging) -> torch.nn.Module:
+    if vocab_size is not None:
+        if hasattr(args, 'vocab_size'):
+            raise Exception('Vocabulary size already set')
+        args.vocab_size = vocab_size
+    if args.arch == 'elman':
+        model = VanillaRNN(vocab_size=args.vocab_size, embedding_size=args.embedding_size, hidden_dim=args.hidden_dize,
+                           n_layers=args.n_layers, mode='elman')
+    elif args.arch == 'jordan':
+        model = VanillaRNN(vocab_size=args.vocab_size, embedding_size=args.embedding_size, hidden_dim=args.hidden_dize,
+                           n_layers=args.n_layers, mode='jordan')
+    elif args.arch == 'AlbertRNN':
+        model = AlbertRNN(vocab_size=args.vocab_size, embed_size=64, num_output=1, rnn_model='LSTM', use_last=True,
+                          hidden_size=64, num_layers=1)
     else:
-        raise NotADirectoryError(s)
-
-
-def load_arch(args):
-    if args.arch == 'whatever':
+        log.error("Architecture not implemented")
         raise NotImplementedError()
-    else:
-        raise NotImplementedError()
-
-
-class LabelSmoothingLoss(nn.Module):
-    def __init__(self, smoothing=0.0):
-        super(LabelSmoothingLoss, self).__init__()
-        self.smoothing = smoothing
-
-    @staticmethod
-    def smooth_one_hot(target, classes, smoothing=0.0):
-        assert 0 <= smoothing < 1
-        shape = (target.size(0), classes)
-        with torch.no_grad():
-            target = torch.empty(size=shape, device=target.device) \
-                .fill_(smoothing / (classes - 1)) \
-                .scatter_(1, target.data.unsqueeze(1), 1. - smoothing)
-
-        return target
-
-    def forward(self, input_, target):
-        target = LabelSmoothingLoss.smooth_one_hot(target, input_.size(-1), self.smoothing)
-        lsm = F.log_softmax(input_, -1)
-        loss = -(target * lsm).sum(-1)
-        loss = loss.mean()
-
-        return loss
+    return model
 
 
 def pack_right_padded_seq(seqs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
