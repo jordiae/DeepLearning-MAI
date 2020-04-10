@@ -153,7 +153,7 @@ def main():
     model.to(device)
 
     logging.info('===> Training')
-    train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging, resume_info)
+    train(args, train_loader, valid_loader, model, device, optimizer, criterion, resume_info)
 
 
 if __name__ == '__main__':
