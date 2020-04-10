@@ -21,25 +21,6 @@ def load_arch(args: argparse.Namespace) -> torch.nn.Module:
     return model
 
 
-def pack_right_padded_seq_(seqs: torch.Tensor, lengths: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-    """
-    Function for packing a right-padded sequence, imitating the functionality of
-    torch.nn.utils.rnn.pack_padded_sequence.
-    The function flattens all sequences into a single sequence, ordered by time-step ([first token of first batch,
-    first token of second batch,... last token of last batch] and removes padding. It also returns the effective batch
-    size at each iteration, which will be [number of first tokens across batch, number of second tokens...]
-    :param seqs: [batch, right-padded tokens]
-    :return: ([packed tokens], [effective batch sizes])
-    """
-
-    seqs = seqs.permute(-1, 0).reshape(seqs.shape[0] * seqs.shape[1])  # [batch, tokens] -> [batch*tokens]
-    pad_idx = (seqs == 0).nonzero().flatten()
-    non_pad_idx = (seqs != 0).nonzero().flatten()
-    seqs = seqs[non_pad_idx]
-    effective_batch_sizes = pad_idx
-    return seqs, effective_batch_sizes
-
-
 def pack_right_padded_seq(seqs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Function for packing a right-padded sequence, inspired by the functionality of
@@ -57,7 +38,6 @@ def pack_right_padded_seq(seqs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tenso
     pad_idx = (seqs == 0).nonzero().flatten()
     non_pad_idx = (seqs != 0).nonzero().flatten()
     seqs = seqs[non_pad_idx]
-    effective_batch_sizes = pad_idx
     return seqs, effective_batch_sizes
 
 
