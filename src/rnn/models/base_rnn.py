@@ -118,8 +118,9 @@ class BaseRNN(nn.Module):
         for effective_batch_size in effective_batch_sizes:
             effective_batch = x[done_batches:effective_batch_size+done_batches]
             for idx, layer in enumerate(self.layers):
-                effective_batch = layer(effective_batch, hidden[:, idx])
-                hidden[:, idx] = effective_batch
+                hidden_batch = hidden[:effective_batch_size, idx].clone()
+                effective_batch = layer(effective_batch, hidden_batch)
+                hidden[:effective_batch_size, idx] = effective_batch
             done_batches += effective_batch_size
         x = hidden[:, -1]
 
@@ -129,8 +130,9 @@ class BaseRNN(nn.Module):
             for effective_batch_size in reverse_effective_batch_sizes:
                 effective_batch = reverse_x[done_batches:effective_batch_size + done_batches]
                 for idx, layer in enumerate(self.layers):
-                    effective_batch = layer(effective_batch, hidden[:, idx])
-                    hidden[:, idx] = effective_batch
+                    hidden_batch = hidden[:effective_batch_size, idx].clone()
+                    effective_batch = layer(effective_batch, hidden_batch)
+                    hidden[:effective_batch_size, idx] = effective_batch
                 done_batches += effective_batch_size
             reverse_x = hidden[:, -1]
 
