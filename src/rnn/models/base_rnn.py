@@ -1,42 +1,72 @@
 import torch.nn as nn
 import torch
+from ..utils import pack_right_padded_seq, unpack_seq
 
 
 class BaseRNN(nn.Module):
-    def __init__(self, vocab_size, embedding_size, output_size, hidden_dim, n_layers):
-        super(BaseRNN, self).__init__()
-
-        # Defining some parameters
-        self.hidden_dim = hidden_dim
+    def __init__(self, vocab_size: int, embedding_dim: int, hidden_features: int, n_layers: int, output_features: int,
+                 dropout: float = 0.0, bidirectional: bool = False, activation: str = 'tanh'):
+        super(BaseRNN).__init__()
+        assert vocab_size > 0
+        self.vocab_size = vocab_size
+        assert embedding_dim > 0
+        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.input_features = embedding_dim
+        assert hidden_features > 0
+        self.hidden_features = hidden_features
+        assert n_layers > 0
         self.n_layers = n_layers
+        assert output_features > 0
+        self.output_features = output_features
+        assert dropout >= 0.0 and dropout < 1
+        self.dropout = dropout
+        self.bidirectional = bidirectional
+        self.layers = self._init_layers()
+        if self.bidirectional:
+            self.layers_reverse = self._init_layers()
+        self.activation = activation
 
-        # Defining the layers
-        # Embedding
-        self.embedding = nn.Embedding(vocab_size, embedding_size)
-        # RNN Layer
-        self.rnn = nn.LSTM(embedding_size, hidden_dim, n_layers, batch_first=True)
-        # Fully connected layer
-        self.fc = nn.Linear(hidden_dim, output_size)
+    def _init_layers(self) -> torch.nn.ModuleList:
+        raise NotImplementedError()
 
-    def forward(self, x):
-        batch_size = x.size(0)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        :param x: [batch, seq_len, (right-padded) tokens]
+        :return: [batch, features]
+        """
 
-        # Initializing hidden state for first input using method defined below
-        hidden = self.init_hidden(batch_size)
+        x, effective_batch_sizes = pack_right_padded_seq(x)
 
-        # Embedding
         x = self.embedding(x)
 
-        # Passing in the input and hidden state into the model and obtaining outputs
-        out, hidden = self.rnn(x)
+        if self.bidirectional:
+            reverse_x = x.clone()
+            reverse_x = torch.flip(reverse_x, dims=(-1, ))
+            reverse_effective_batch_sizes = effective_batch_sizes.clone()
+            reverse_effective_batch_sizes = torch.flip(reverse_effective_batch_sizes, dims=(-1, ))
 
-        out = self.fc(out[:, -1, :])
+        done_batches = 0
+        hidden = torch.zeros(self.n_layers, self.hidden_features)
+        for effective_batch_size in effective_batch_sizes:
+            effective_batch = x[done_batches:effective_batch_size]
+            for idx, layer in enumerate(self.layers):
+                effective_batch = layer(effective_batch, hidden[idx])
+                hidden[idx] = effective_batch
+            done_batches += effective_batch_size
+        x = hidden[-1]
 
-        return out
+        if self.bidirectional:
+            done_batches = 0
+            hidden = torch.zeros(self.n_layers, self.hidden_features)
+            for effective_batch_size in reverse_effective_batch_sizes:
+                effective_batch = reverse_x[done_batches:effective_batch_size]
+                for idx, layer in enumerate(self.layers):
+                    effective_batch = layer(effective_batch, hidden[idx])
+                    hidden[idx] = effective_batch
+                done_batches += effective_batch_size
 
-    def init_hidden(self, batch_size):
-        # This method generates the first hidden state of zeros which we'll use in the forward pass
-        # We'll send the tensor holding the hidden state to the device we specified earlier as well
-        hidden = torch.zeros(self.n_layers, batch_size, self.hidden_dim)
-        return hidden
-
+        x = unpack_seq(x, effective_batch_sizes)
+        if self.bidirectional:
+            reverse_x = unpack_seq(reverse_x, reverse_effective_batch_sizes)
+            x = torch.cat((x, reverse_x), dim=-1)
+        return x
