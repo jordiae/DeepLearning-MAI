@@ -8,10 +8,10 @@ from rnn.dataset import MathDataset, SortedShufflingDataLoader
 import json
 from torch.utils.tensorboard import SummaryWriter
 from rnn.evaluate import prettify_eval, evaluate
-from src.rnn.utils import load_arch
+from src.rnn.utils import load_arch, init_train_logging
 
 
-def train(args, train_loader, valid_loader, model, device, optimizer, criterion, logging, resume_info):
+def train(args, train_loader, valid_loader, model, device, optimizer, criterion, resume_info):
     writer = SummaryWriter()
     with open('args.json', 'w') as f:
         json.dump(args.__dict__, f, indent=2)
@@ -27,8 +27,8 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
         total = 0
         correct = 0
         for idx, data in enumerate(train_loader):
-            # if (idx+1) % 10 == 0:
-            #     logging.info(f'{idx+1}/{len(train_loader)} batches')
+            if (idx+1) % 10 == 0:
+                logging.info(f'{idx+1}/{len(train_loader)} batches')
             inputs, labels = data[0].to(device), data[1].to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
@@ -80,7 +80,7 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
         with open('resume_info.json', 'w') as f:
             json.dump(resume_info, f, indent=2)
 
-    model = load_arch(None, args, logging)
+    model = load_arch(args)
     model.load_state_dict(torch.load('checkpoint_best.pt'))
     model.to(device)
     eval_res = evaluate(valid_loader, model, device)
@@ -110,13 +110,7 @@ def main():
     parser.add_argument('--bidrectional', action='store_true', help='Use bidirectional RNNs')
     args = parser.parse_args()
 
-    # Logger
-    log_path = 'train.log'
-    if os.path.exists('checkpoint_last.pt'):
-        logging.basicConfig(filename=log_path, level=logging.INFO, filemode='a')
-    else:
-        logging.basicConfig(filename=log_path, level=logging.INFO)
-    logging.getLogger('').addHandler(logging.StreamHandler())
+    init_train_logging()
 
     # Load train and validation datasets
     logging.info('===> Loading datasets')
@@ -125,6 +119,10 @@ def main():
     train_dataset = MathDataset(path=data_path, subset='train', sort=True)
     token2idx, idx2token, unk_token_idx = train_dataset.get_vocab()
     vocab_size = len(token2idx)
+    args.vocab_size = vocab_size
+    args.token2idx = token2idx
+    args.idx2token = idx2token
+    args.unk_token_idx = unk_token_idx
     valid_dataset = MathDataset(path=data_path, subset='valid', token2idx=token2idx, idx2token=idx2token)
     train_loader = SortedShufflingDataLoader(train_dataset, mode='strict_shuffle', batch_size=args.batch_size)
     valid_loader = SortedShufflingDataLoader(valid_dataset, mode='no_shuffle', batch_size=args.batch_size)
@@ -133,7 +131,7 @@ def main():
     logging.info('===> Building model')
     logging.info(args)
 
-    model = load_arch(vocab_size, args, logging)
+    model = load_arch(args)
 
     resume_info = dict(epoch=0, best_valid_metric=0.0, epochs_without_improvement=0)
 
