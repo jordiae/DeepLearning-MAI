@@ -127,9 +127,9 @@ class BaseRNN(nn.Module):
             done_batches = 0
             hidden = torch.zeros(bs, self.n_layers, self.hidden_features)
             for effective_batch_size in reverse_effective_batch_sizes:
-                effective_batch = x[done_batches:effective_batch_size]
+                effective_batch = reverse_x[done_batches:effective_batch_size + done_batches]
                 for idx, layer in enumerate(self.layers):
-                    effective_batch = layer(effective_batch, hidden[idx])
+                    effective_batch = layer(effective_batch, hidden[:, idx])
                     hidden[:, idx] = effective_batch
                 done_batches += effective_batch_size
             reverse_x = hidden[:, -1]
