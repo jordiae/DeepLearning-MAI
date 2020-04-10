@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-from ..utils import pack_right_padded_seq
+from rnn.utils import pack_right_padded_seq
 import torch.nn.functional as F
 import math
 
@@ -11,7 +11,7 @@ class BinaryClassifier(nn.Module):
         MLP classifier with one hidden layer
         :param in_features:
         """
-        super(BinaryClassifier).__init__()
+        super().__init__()
         self.linear = nn.Linear(in_features, 1)
 
     def forward(self, x):
@@ -28,7 +28,7 @@ class BaseRNNLayer(nn.Module):
         :param hidden_features:
         :param activation:
         """
-        super(BaseRNNLayer).__init__()
+        super().__init__()
         assert input_features > 0
         self.input_features = input_features
         assert hidden_features > 0
@@ -71,7 +71,7 @@ class BaseRNN(nn.Module):
         :param activation: Activation function to be used in the recurrent layers (not in the classifier, which will
         always be a sigmoid).
         """
-        super(BaseRNN).__init__()
+        super().__init__()
         assert vocab_size > 0
         self.vocab_size = vocab_size
         assert embedding_dim > 0
@@ -86,10 +86,10 @@ class BaseRNN(nn.Module):
         if self.dropout > 0:
             self.fc_dropout_layer = nn.Dropout(dropout)
         self.bidirectional = bidirectional
+        self.activation = activation
         self.layers = self._init_layers()
         if self.bidirectional:
             self.layers_reverse = self._init_layers()
-        self.activation = activation
         self.classifier = BinaryClassifier(hidden_features if not self.bidirectional else hidden_features*2)
 
     def _init_layers(self) -> torch.nn.ModuleList:
