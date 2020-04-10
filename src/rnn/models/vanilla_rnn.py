@@ -1,6 +1,6 @@
 from torch import nn
 import torch
-from .base_rnn import BaseRNN, BaseRNNLayer
+from rnn.models.base_rnn import BaseRNN, BaseRNNLayer
 
 
 class VanillaRNNLayer(BaseRNNLayer):
@@ -50,3 +50,9 @@ class VanillaRNN(BaseRNN):
             layers.append(VanillaRNNLayer(self.input_features, self.hidden_features, self.activation, mode=self.mode))
         layers = nn.ModuleList(layers)
         return layers
+
+if __name__ == '__main__':
+    net = VanillaRNN(100, 64, 128, 3)
+    x = torch.tensor([[2,3], [4,5]])
+    y = net(x)
+    print()
