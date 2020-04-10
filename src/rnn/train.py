@@ -90,7 +90,7 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
 def main():
     # Settings
     parser = argparse.ArgumentParser(description="Train a RNN for Deepmind's Mathematics Dataset")
-    parser.add_argument('--arch', type=str, help='Architecture', default='ElmanRNN')
+    parser.add_argument('--arch', type=str, help='Architecture', default='elman')
     parser.add_argument('--epochs', type=int, help='Number of epochs', default=100)
     parser.add_argument('--lr', type=float, help='Learning Rate', default=0.001)
     parser.add_argument('--momentum', type=float, help='Momentum', default=0.9)
