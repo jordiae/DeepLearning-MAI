@@ -8,10 +8,10 @@ import logging
 
 def load_arch(args: argparse.Namespace) -> torch.nn.Module:
     if args.arch == 'elman':
-        model = VanillaRNN(vocab_size=args.vocab_size, embedding_size=args.embedding_size, hidden_dim=args.hidden_dize,
+        model = VanillaRNN(vocab_size=args.vocab_size, embedding_size=args.embedding_size, hidden_dim=args.hidden_size,
                            n_layers=args.n_layers, mode='elman')
     elif args.arch == 'jordan':
-        model = VanillaRNN(vocab_size=args.vocab_size, embedding_size=args.embedding_size, hidden_dim=args.hidden_dize,
+        model = VanillaRNN(vocab_size=args.vocab_size, embedding_size=args.embedding_size, hidden_dim=args.hidden_size,
                            n_layers=args.n_layers, mode='jordan')
     elif args.arch == 'AlbertRNN':
         model = AlbertRNN(vocab_size=args.vocab_size, embed_size=64, num_output=1, rnn_model='LSTM', use_last=True,
