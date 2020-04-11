@@ -77,6 +77,9 @@ if __name__ == '__main__':
     parser.add_argument('--arch', type=str, help='Architecture')
     parser.add_argument('--models-path', type=str, help='Path to model directory. If more than one path is provided, an'
                                                         'ensemble of models os loaded', nargs='+')
+    parser.add_argument('--problem-types', type=str, nargs='*', help='List of problems to load from dataset')
+    parser.add_argument('--dataset-instances', type=int, default=100000,
+                        help='Number of total instances we want to load from the dataset')
     parser.add_argument('--checkpoint', type=str, default='checkpoint_best.pt',  help='Checkpoint name')
     parser.add_argument('--subset', type=str, help='Data subset', default='test')
     parser.add_argument('--no-cuda', action='store_true', help='disables CUDA training')
@@ -85,8 +88,7 @@ if __name__ == '__main__':
     log_path = f'eval-{args.subset}.log'
     logging.basicConfig(filename=log_path, level=logging.INFO)
     logging.getLogger('').addHandler(logging.StreamHandler())
-    data_path = os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
-                             'train_easy_true_false_concat_subsampled.txt')
+    data_path = os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0', 'train-easy')
 
     device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
 
@@ -105,8 +107,8 @@ if __name__ == '__main__':
         model.to(device)
         models.append(model)
 
-    dataset = MathDataset(path=data_path, subset=args.subset, token2idx=token2idx,
-                          idx2token=idx2token, sort=True)
+    dataset = MathDataset(path=data_path, subset=args.subset, token2idx=token2idx, idx2token=idx2token, sort=True,
+                          total_lines=args.dataset_instances, problem_types=args.problem_types)
     data_loader = SortedShufflingDataLoader(dataset, mode='no_shuffle', batch_size=train_args.batch_size)
 
     if len(models) == 1:
