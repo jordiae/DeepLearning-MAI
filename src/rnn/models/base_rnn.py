@@ -4,6 +4,8 @@ from rnn.utils import pack_right_padded_seq
 import math
 from typing import Union
 from typing import Tuple
+import argparse
+from rnn.models import VanillaRNN, LSTM, GRU
 
 
 class BinaryClassifier(nn.Module):
@@ -97,20 +99,23 @@ class BaseRNN(nn.Module):
         layers. """
         raise NotImplementedError()
 
-    def _forward(self, x: torch.Tensor, layers: torch.nn.ModuleList, bs: int, effective_batch_sizes: torch.Tensor) ->\
-            torch.Tensor:
+    def _forward(self, x: torch.Tensor, layers: torch.nn.ModuleList, bs: int, effective_batch_sizes: torch.Tensor,
+                 initial_hidden: Union[torch.Tensor, None], initial_cell: Union[torch.Tensor, None]) ->\
+            Tuple[torch.Tensor, Union[torch.Tensor, None]]:
         """
         Auxiliar method for computing the forward pass of a RNN network (it will be called twice if it is bidirectional)
         :param x: Input tokens, already packed passed through the embedding layer.
         :param layers: Layers of the network.
         :param bs: Batch size.
         :param effective_batch_sizes: Effective batch sizes due to packing.
-        :return: Final hidden states.
+        :param initial_hidden: Initial hidden state (set to 0 if None)
+        :param initial_cell: Initial cell state, if the model has an internal cell state, eg. LSTMs (set to 0 if None)
+        :return: Final hidden states. :return: Final hidden states of each layer: [batch, n_layers, hidden_features].
         """
         done_batches = 0
-        hidden = torch.zeros(bs, self.n_layers, self.hidden_features)
+        hidden = torch.zeros(bs, self.n_layers, self.hidden_features) if initial_hidden is None else initial_hidden
         if self.cell:
-            cell = torch.zeros(bs, self.n_layers, self.hidden_features)
+            cell = torch.zeros(bs, self.n_layers, self.hidden_features) if initial_cell is None else initial_cell
         for effective_batch_size in effective_batch_sizes:
             effective_batch = x[done_batches:effective_batch_size + done_batches]
             for idx, layer in enumerate(layers):
@@ -124,13 +129,19 @@ class BaseRNN(nn.Module):
                     hidden[:effective_batch_size, idx] = effective_batch
                     cell[:effective_batch_size, idx] = s
             done_batches += effective_batch_size
-        return hidden
+        return hidden, None if not self.cell else cell
 
-    def forward(self, x: torch.Tensor, lengths: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, lengths: torch.Tensor, initial_hidden: Union[torch.Tensor, None],
+                initial_cell: Union[torch.Tensor, None]) -> \
+            Tuple[torch.Tensor, torch.Tensor, Union[torch.Tensor, None]]:
         """
         :param x: [batch, seq_len, (right-padded) tokens]
         :param lengths: [batch]
-        :return: [batch, 1]
+        :param initial_hidden: Either None or [batch, n_layers, hidden_features]
+        :param initial_cell: Either None or [batch, n_layers, hidden_features]
+        :return: Tuple [batch, hidden_Features], [batch, n_layers, hidden_features], [batch, n_layers, hidden_features],
+        where the first element contains the final hidden states of the last layer, and the second and third one contain
+        the final hidden and cell states from all layers, respectively.
         """
         bs = x.shape[0]
         x, effective_batch_sizes = pack_right_padded_seq(x, lengths)
@@ -142,18 +153,81 @@ class BaseRNN(nn.Module):
             reverse_x = torch.flip(reverse_x, dims=(-1, ))
             reverse_effective_batch_sizes = effective_batch_sizes.clone()
             reverse_effective_batch_sizes = torch.flip(reverse_effective_batch_sizes, dims=(-1, ))
+            if initial_hidden is not None:
+                initial_hidden, reverse_initial_hidden = torch.unbind(initial_hidden)
+            if initial_cell is not None:
+                initial_cell, reverse_initial_cell = torch.unbind(initial_cell)
 
-        hidden = self._forward(x, self.layers, bs, effective_batch_sizes)
+        hidden, cell = self._forward(x, self.layers, bs, effective_batch_sizes, initial_hidden, initial_cell)
         x = hidden[:, -1]
 
         if self.bidirectional:
-            reverse_hidden = self._forward(reverse_x, self.layers, bs, reverse_effective_batch_sizes)
+            reverse_hidden, reverse_cell = self._forward(reverse_x, self.layers, bs, reverse_effective_batch_sizes,
+                                                         reverse_initial_hidden)
             reverse_x = reverse_hidden[:, -1]
+            hidden = torch.stack((hidden, reverse_hidden))
+            if self.cell:
+                cell = torch.stack((cell, reverse_cell))
             x = torch.cat((x, reverse_x), dim=-1)
 
-        if self.dropout > 0.0:
-            x = self.fc_dropout_layer(x)
+        return x, hidden, None if not self.cell else cell
 
-        x = self.classifier(x)
 
+class Decoder(nn.Module):
+    def __init__(self, net: nn.Module, vocab_size: int):
+        super(Decoder, self).__init__()
+        self.net = net
+        self.softmax = nn.LogSoftmax(dim=vocab_size)
+
+    def forward(self, tgt_tokens, tgt_lengths, initial_hidden):
+        x, _, _ = self.net(tgt_tokens, tgt_lengths, initial_hidden)
+        x = self.softmax(x)
         return x
+
+
+class Seq2Seq(nn.Module):
+    def __init__(self, encoder: nn.Module, decoder: nn.Module):
+        super(Seq2Seq, self).__init__()
+        assert encoder.hidden_features == decoder.hidden_features
+        assert encoder.n_layers == decoder.n_layers
+        self.encoder = encoder
+        self.decoder = decoder
+
+    def forward(self, src_tokens, src_lengths, tgt_tokens=None, tgt_lengths=None):
+        _, hidden, cell = self.encoder(src_tokens, src_lengths)
+        x = self.decoder(tgt_tokens, tgt_lengths, hidden, cell)
+        return x
+
+
+def build_model(args: argparse.Namespace) -> nn.Module:
+    """
+    Returns initialized Seq2seq model.
+    :param args: Arguments from argparse.
+    :return: Initialized model
+    """
+    if args.arch == 'elman':
+        encoder = VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+                             hidden_features=args.hidden_size, n_layers=args.n_layers, mode='elman')
+        decoder = Decoder(VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+                                     hidden_features=args.hidden_size, n_layers=args.n_layers, mode='elman'),
+                          args.vocab_size)
+    elif args.arch == 'jordan':
+        encoder = VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+                             hidden_features=args.hidden_size, n_layers=args.n_layers, mode='jordan')
+        decoder = Decoder(VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+                                     hidden_features=args.hidden_size, n_layers=args.n_layers, mode='jordan'),
+                          args.vocab_size)
+    elif args.arch == 'lstm':
+        encoder = LSTM(vocab_size=args.vocab_size, embedding_dim=args.embedding_size, hidden_features=args.hidden_size,
+                       n_layers=args.n_layers)
+        decoder = Decoder(LSTM(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+                               hidden_features=args.hidden_size, n_layers=args.n_layers), args.vocab_size)
+    elif args.arch == 'gru':
+        encoder = GRU(vocab_size=args.vocab_size, embedding_dim=args.embedding_size, hidden_features=args.hidden_size,
+                      n_layers=args.n_layers)
+        decoder = Decoder(GRU(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+                              hidden_features=args.hidden_size, n_layers=args.n_layers), args.vocab_size)
+    else:
+        raise NotImplementedError()
+    return Seq2Seq(encoder, decoder)
+
