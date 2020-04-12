@@ -4,8 +4,6 @@ from rnn.utils import pack_right_padded_seq
 import math
 from typing import Union
 from typing import Tuple
-import argparse
-from rnn.models import VanillaRNN, LSTM, GRU
 
 
 class BinaryClassifier(nn.Module):
@@ -131,8 +129,8 @@ class BaseRNN(nn.Module):
             done_batches += effective_batch_size
         return hidden, None if not self.cell else cell
 
-    def forward(self, x: torch.Tensor, lengths: torch.Tensor, initial_hidden: Union[torch.Tensor, None],
-                initial_cell: Union[torch.Tensor, None]) -> \
+    def forward(self, x: torch.Tensor, lengths: torch.Tensor, initial_hidden: Union[torch.Tensor, None] = None,
+                initial_cell: Union[torch.Tensor, None] = None) -> \
             Tuple[torch.Tensor, torch.Tensor, Union[torch.Tensor, None]]:
         """
         :param x: [batch, seq_len, (right-padded) tokens]

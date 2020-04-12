@@ -11,17 +11,20 @@ from rnn.evaluate import prettify_eval, evaluate
 from src.rnn.utils import load_arch, init_train_logging
 
 
-def train(args, train_loader, valid_loader, model, device, optimizer, criterion, resume_info):
+def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_encoder, optimizer_decoder, criterion,
+          resume_info):
     writer = SummaryWriter()
     with open('args.json', 'w') as f:
         json.dump(args.__dict__, f, indent=2)
     logging.info(args)
-    logging.info(model)
+    logging.info(encoder)
+    logging.info(decoder)
     best_valid_metric = resume_info['best_valid_metric']
     epochs_without_improvement = resume_info['epochs_without_improvement']
     for epoch in range(resume_info['epoch'], args.epochs):
         # train step (full epoch)
-        model.train()
+        encoder.train()
+        decoder.train()
         logging.info(f'Epoch {epoch+1} |')
         loss_train = 0.0
         total = 0
@@ -31,15 +34,32 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
                 logging.info(f'{idx+1}/{len(train_loader)} batches')
             src_tokens, tgt_tokens, src_lengths, tgt_lengths = data[0].to(device), data[1].to(device), \
                                                                data[2].to(device), data[3].to(device)
-            optimizer.zero_grad()
-            outputs = model(src_tokens, src_lengths)
+            optimizer_encoder.zero_grad()
+            optimizer_decoder.zero_grad()
+            _, encoder_hidden, encoder_cell = encoder(src_tokens, src_lengths)
+            decoder_hidden = encoder_hidden
+            decoder_cell = encoder_cell
+
+            outputs = []
+            loss = 0
+            transposed_tgt_tokens = tgt_tokens.t()
+            for idx, tgt in enumerate(transposed_tgt_tokens):
+                tgt = tgt.view(tgt.shape[0], 1)
+                # Teacher forcing
+                decoder_x, decoder_hidden, decoder_cell = decoder(tgt, torch.ones(tgt.shape[0]), decoder_hidden,
+                                                                  decoder_cell)
+                if EOS: break
+                loss += criterion(decoder_x, transposed_tgt_tokens[idx+1])
+                outputs.append(tgt)
+
             total += tgt_tokens.size(0)
             predicted = torch.round(outputs.data)
             tgt_tokens = tgt_tokens.unsqueeze(1).float()
             correct += (predicted == tgt_tokens).sum().item()
             loss = criterion(outputs, tgt_tokens)
             loss.backward()
-            optimizer.step()
+            optimizer_encoder.step()
+            optimizer_decoder.step()
             loss_train += loss.item()
         accuracy = 100 * correct / total
         logging.info(f'train: avg_loss = {loss_train/total:.5f} | accuracy = {accuracy:.2f}')
@@ -50,7 +70,8 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
         correct = 0
         total = 0
         loss_val = 0
-        model.eval()
+        encoder.eval()
+        decoder.eval()
         with torch.no_grad():
             for data in valid_loader:
                 src_tokens, tgt_tokens, src_lengths, tgt_lengths = data[0].to(device), data[1].to(device), \
@@ -135,29 +156,35 @@ def main():
     logging.info('===> Building model')
     logging.info(args)
 
-    model = load_arch(args)
+    encoder, decoder = load_arch(args)
 
     resume_info = dict(epoch=0, best_valid_metric=0.0, epochs_without_improvement=0)
 
     if args.optimizer == 'SGD':
-        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+        optimizer_encoder = optim.SGD(encoder.parameters(), lr=args.lr, momentum=args.momentum,
+                                      weight_decay=args.weight_decay)
+        optimizer_decoder = optim.SGD(decoder.parameters(), lr=args.lr, momentum=args.momentum,
+                                      weight_decay=args.weight_decay)
     elif args.optimizer == 'Adam':
-        optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        optimizer_encoder = optim.Adam(encoder.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        optimizer_decoder = optim.Adam(decoder.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     else:
         logging.error("Optimizer not implemented")
         raise NotImplementedError()
 
-    if args.criterion == 'bce':
-        criterion = nn.BCELoss()
+    if args.criterion == 'xent':
+        criterion = nn.NLLLoss()
     else:
         logging.error("Criterion not implemented")
         raise NotImplementedError()
 
     device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
-    model.to(device)
+    encoder.to(device)
+    decoder.to(device)
 
     logging.info('===> Training')
-    train(args, train_loader, valid_loader, model, device, optimizer, criterion, resume_info)
+    train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_encoder, optimizer_decoder, criterion,
+          resume_info)
 
 
 if __name__ == '__main__':
