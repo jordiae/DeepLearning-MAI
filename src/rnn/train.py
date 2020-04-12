@@ -91,6 +91,9 @@ def main():
     # Settings
     parser = argparse.ArgumentParser(description="Train a RNN for Deepmind's Mathematics Dataset")
     parser.add_argument('--arch', type=str, help='Architecture', default='elman')
+    parser.add_argument('--problem-types', type=str, nargs='*', help='List of problems to load from dataset')
+    parser.add_argument('--dataset-instances', type=int, default=100000,
+                        help='Number of total instances we want to load from the dataset')
     parser.add_argument('--epochs', type=int, help='Number of epochs', default=100)
     parser.add_argument('--lr', type=float, help='Learning Rate', default=0.001)
     parser.add_argument('--momentum', type=float, help='Momentum', default=0.9)
@@ -102,28 +105,27 @@ def main():
     parser.add_argument('--early-stop', type=int,
                         help='Patience in early stop in validation set (-1 -> no early stop)', default=5)
     parser.add_argument('--weight-decay', type=float, help='Weight decay', default=0.001)
-
     parser.add_argument('--dropout', type=float, help='Dropout in RNN and FC layers', default=0.25)
     parser.add_argument('--embedding-size', type=int, help='Embedding size', default=64)
     parser.add_argument('--hidden-size', type=int, help='Hidden state size', default=128)
     parser.add_argument('--n-layers', type=int, help='Number of recurrent layers', default=1)
     parser.add_argument('--bidrectional', action='store_true', help='Use bidirectional RNNs')
     args = parser.parse_args()
-
     init_train_logging()
 
     # Load train and validation datasets
     logging.info('===> Loading datasets')
-    data_path = os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0',
-                             'train_easy_true_false_concat_subsampled.txt')
-    train_dataset = MathDataset(path=data_path, subset='train', sort=True)
+    data_path = os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0', 'train-easy')
+    train_dataset = MathDataset(path=data_path, subset='train', sort=True, total_lines=args.dataset_instances,
+                                problem_types=args.problem_types)
     token2idx, idx2token, unk_token_idx = train_dataset.get_vocab()
     vocab_size = len(token2idx)
     args.vocab_size = vocab_size
     args.token2idx = token2idx
     args.idx2token = idx2token
     args.unk_token_idx = unk_token_idx
-    valid_dataset = MathDataset(path=data_path, subset='valid', sort=True, token2idx=token2idx, idx2token=idx2token)
+    valid_dataset = MathDataset(path=data_path, subset='valid', sort=True, token2idx=token2idx, idx2token=idx2token,
+                                total_lines=args.dataset_instances, problem_types=args.problem_types)
     train_loader = SortedShufflingDataLoader(train_dataset, mode='strict_shuffle', batch_size=args.batch_size)
     valid_loader = SortedShufflingDataLoader(valid_dataset, mode='no_shuffle', batch_size=args.batch_size)
 
