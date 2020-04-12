@@ -97,6 +97,27 @@ class BaseRNN(nn.Module):
         layers. """
         raise NotImplementedError()
 
+    def _forward(self, x: torch.Tensor, layers: torch.nn.ModuleList, bs: int, effective_batch_sizes: torch.Tensor) ->\
+            torch.Tensor:
+        done_batches = 0
+        hidden = torch.zeros(bs, self.n_layers, self.hidden_features)
+        if self.cell:
+            cell = torch.zeros(bs, self.n_layers, self.hidden_features)
+        for effective_batch_size in effective_batch_sizes:
+            effective_batch = x[done_batches:effective_batch_size + done_batches]
+            for idx, layer in enumerate(layers):
+                hidden_batch = hidden[:effective_batch_size, idx].clone()
+                if not self.cell:
+                    effective_batch, _ = layer(effective_batch, hidden_batch)
+                    hidden[:effective_batch_size, idx] = effective_batch
+                else:
+                    cell_batch = cell[:effective_batch_size, idx].clone()
+                    effective_batch, s = layer(effective_batch, hidden_batch, cell_batch)
+                    hidden[:effective_batch_size, idx] = effective_batch
+                    cell[:effective_batch_size, idx] = s
+            done_batches += effective_batch_size
+        return hidden
+
     def forward(self, x: torch.Tensor, lengths: torch.Tensor) -> torch.Tensor:
         """
         :param x: [batch, seq_len, (right-padded) tokens]
@@ -114,46 +135,12 @@ class BaseRNN(nn.Module):
             reverse_effective_batch_sizes = effective_batch_sizes.clone()
             reverse_effective_batch_sizes = torch.flip(reverse_effective_batch_sizes, dims=(-1, ))
 
-        done_batches = 0
-        hidden = torch.zeros(bs, self.n_layers, self.hidden_features)
-        if self.cell:
-            cell = torch.zeros(bs, self.n_layers, self.hidden_features)
-        for effective_batch_size in effective_batch_sizes:
-            effective_batch = x[done_batches:effective_batch_size+done_batches]
-            for idx, layer in enumerate(self.layers):
-                hidden_batch = hidden[:effective_batch_size, idx].clone()
-                if not self.cell:
-                    effective_batch, _ = layer(effective_batch, hidden_batch)
-                    hidden[:effective_batch_size, idx] = effective_batch
-                else:
-                    cell_batch = cell[:effective_batch_size, idx].clone()
-                    effective_batch, s = layer(effective_batch, hidden_batch, cell_batch)
-                    hidden[:effective_batch_size, idx] = effective_batch
-                    cell[:effective_batch_size, idx] = s
-            done_batches += effective_batch_size
+        hidden = self._forward(x, self.layers, bs, effective_batch_sizes)
         x = hidden[:, -1]
 
         if self.bidirectional:
-            done_batches = 0
-            hidden = torch.zeros(bs, self.n_layers, self.hidden_features)
-            if self.cell:
-                cell = torch.zeros(bs, self.n_layers, self.hidden_features)
-            for effective_batch_size in reverse_effective_batch_sizes:
-                effective_batch = reverse_x[done_batches:effective_batch_size + done_batches]
-                for idx, layer in enumerate(self.layers):
-                    hidden_batch = hidden[:effective_batch_size, idx].clone()
-                    if not self.cell:
-                        effective_batch, _ = layer(effective_batch, hidden_batch)
-                        hidden[:effective_batch_size, idx] = effective_batch
-                    else:
-                        cell_batch = cell[:effective_batch_size, idx].clone()
-                        effective_batch, s = layer(effective_batch, hidden_batch, cell_batch)
-                        hidden[:effective_batch_size, idx] = effective_batch
-                        cell[:effective_batch_size, idx] = s
-                done_batches += effective_batch_size
-            reverse_x = hidden[:, -1]
-
-        if self.bidirectional:
+            reverse_hidden = self._forward(reverse_x, self.layers, bs, reverse_effective_batch_sizes)
+            reverse_x = reverse_hidden[:, -1]
             x = torch.cat((x, reverse_x), dim=-1)
 
         if self.dropout > 0.0:
