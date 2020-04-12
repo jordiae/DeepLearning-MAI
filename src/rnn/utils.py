@@ -5,13 +5,13 @@ import os
 import logging
 
 
-def load_arch(args: argparse.Namespace) -> object:
+def load_arch(args: argparse.Namespace) -> Tuple[torch.nn.Module, torch.nn.Module]:
     """
     Returns initialized Seq2seq model.
     :param args: Arguments from argparse.
     :return: Initialized model
     """
-    from rnn.models import Seq2Seq, VanillaRNN, LSTM, GRU, Decoder
+    from rnn.models import VanillaRNN, LSTM, GRU, Decoder
     if args.arch == 'elman':
         encoder = VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                              hidden_features=args.hidden_size, n_layers=args.n_layers, mode='elman')
@@ -36,7 +36,7 @@ def load_arch(args: argparse.Namespace) -> object:
                               hidden_features=args.hidden_size, n_layers=args.n_layers), args.vocab_size)
     else:
         raise NotImplementedError()
-    return Seq2Seq(encoder, decoder)
+    return encoder, decoder
 
 
 def pack_right_padded_seq(seqs: torch.Tensor, lengths: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
