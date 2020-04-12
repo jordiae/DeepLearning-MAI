@@ -130,7 +130,7 @@ def main():
     parser.add_argument('--no-cuda', action='store_true', help='disables CUDA training')
     parser.add_argument('--optimizer', type=str, help='Optimizer', default='Adam')
     parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=32)
-    parser.add_argument('--criterion', type=str, help='Criterion', default='bce')
+    parser.add_argument('--criterion', type=str, help='Criterion', default='xent')
     parser.add_argument('--smooth-criterion', type=float, help='Smoothness for label-smoothing', default=0.1)
     parser.add_argument('--early-stop', type=int,
                         help='Patience in early stop in validation set (-1 -> no early stop)', default=5)
