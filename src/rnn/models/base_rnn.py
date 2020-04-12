@@ -147,9 +147,9 @@ class BaseRNN(nn.Module):
                         hidden[:effective_batch_size, idx] = effective_batch
                     else:
                         cell_batch = cell[:effective_batch_size, idx].clone()
-                        effective_batch = layer(effective_batch[0], hidden_batch, cell_batch)
-                        hidden[:effective_batch_size, idx] = effective_batch[0]
-                        cell[:effective_batch_size, idx] = effective_batch[1]
+                        effective_batch, s = layer(effective_batch, hidden_batch, cell_batch)
+                        hidden[:effective_batch_size, idx] = effective_batch
+                        cell[:effective_batch_size, idx] = s
                 done_batches += effective_batch_size
             reverse_x = hidden[:, -1]
 
