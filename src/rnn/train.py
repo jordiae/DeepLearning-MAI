@@ -60,7 +60,7 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
 
             # Binary evaluation: either correct (exactly equal, character by character) or incorrect
             for tgt_idx, c in enumerate(batch_correct):
-                if c == tgt_lengths[tgt_idx]:
+                if c == tgt_lengths[tgt_idx] - 1:  # Don't consider <BOS>
                     correct += 1
             total += tgt_tokens.size(0)
 
