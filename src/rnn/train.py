@@ -69,6 +69,11 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
             total += tgt_tokens.size(0)
 
             loss.backward()
+
+            # Gradient clipping
+            nn.utils.clip_grad_norm_(encoder.parameters(), 0.25)
+            nn.utils.clip_grad_norm_(decoder.parameters(), 0.25)
+
             optimizer_encoder.step()
             optimizer_decoder.step()
             loss_train += loss.item()

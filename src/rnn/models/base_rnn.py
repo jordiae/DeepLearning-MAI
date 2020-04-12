@@ -113,9 +113,11 @@ class BaseRNN(nn.Module):
         :return: Final hidden states. :return: Final hidden states of each layer: [batch, n_layers, hidden_features].
         """
         done_batches = 0
-        hidden = torch.zeros(bs, self.n_layers, self.hidden_features).to(self.device) if initial_hidden is None else initial_hidden
+        hidden = torch.zeros(bs, self.n_layers, self.hidden_features).to(self.device)\
+            if initial_hidden is None else initial_hidden
         if self.cell:
-            cell = torch.zeros(bs, self.n_layers, self.hidden_features).to(self.device) if initial_cell is None else initial_cell
+            cell = torch.zeros(bs, self.n_layers, self.hidden_features).to(self.device)\
+                if initial_cell is None else initial_cell
         for effective_batch_size in effective_batch_sizes:
             effective_batch = x[done_batches:effective_batch_size + done_batches]
             for idx, layer in enumerate(layers):
@@ -144,7 +146,7 @@ class BaseRNN(nn.Module):
         the final hidden and cell states from all layers, respectively.
         """
         bs = x.shape[0]
-        x, effective_batch_sizes = pack_right_padded_seq(x, lengths, self.device)
+        x, effective_batch_sizes, sort_idx = pack_right_padded_seq(x, lengths, self.device)
 
         x = self.embedding(x)
 
@@ -155,21 +157,41 @@ class BaseRNN(nn.Module):
             reverse_effective_batch_sizes = torch.flip(reverse_effective_batch_sizes, dims=(-1, ))
             if initial_hidden is not None:
                 initial_hidden, reverse_initial_hidden = torch.unbind(initial_hidden)
+                if sort_idx is not None:
+                    initial_hidden = initial_hidden[sort_idx]
+                    reverse_initial_hidden = reverse_initial_hidden[sort_idx]
+            else:
+                reverse_initial_hidden = None
             if initial_cell is not None:
                 initial_cell, reverse_initial_cell = torch.unbind(initial_cell)
+                if sort_idx is not None:
+                    initial_cell = initial_cell[sort_idx]
+                    reverse_initial_cell = reverse_initial_cell[sort_idx]
+            else:
+                reverse_initial_cell = None
+        else:
+            if sort_idx is not None:
+                initial_hidden = initial_hidden[sort_idx]
+                if initial_cell is not None:
+                    initial_cell = initial_cell[sort_idx]
 
         hidden, cell = self._forward(x, self.layers, bs, effective_batch_sizes, initial_hidden, initial_cell)
         x = hidden[:, -1]
 
         if self.bidirectional:
             reverse_hidden, reverse_cell = self._forward(reverse_x, self.layers, bs, reverse_effective_batch_sizes,
-                                                         reverse_initial_hidden)
+                                                         reverse_initial_hidden, reverse_initial_cell)
             reverse_x = reverse_hidden[:, -1]
             hidden = torch.stack((hidden, reverse_hidden))
             if self.cell:
                 cell = torch.stack((cell, reverse_cell))
             x = torch.cat((x, reverse_x), dim=-1)
 
+        if sort_idx is not None:
+            x = x[sort_idx]
+            hidden = hidden[sort_idx]
+            if self.cell:
+                cell = cell[sort_idx]
         return x, hidden, None if not self.cell else cell
 
 
