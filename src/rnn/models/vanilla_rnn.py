@@ -1,6 +1,8 @@
 from torch import nn
 import torch
 from rnn.models.base_rnn import BaseRNN, BaseRNNLayer
+from typing import Union
+from typing import Tuple
 
 
 class VanillaRNNLayer(BaseRNNLayer):
@@ -18,18 +20,20 @@ class VanillaRNNLayer(BaseRNNLayer):
             self.c = nn.Parameter(torch.Tensor(self.hidden_features), requires_grad=True)
         self._reset_parameters()
 
-    def forward(self, x: torch.Tensor, h_prev: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, h_prev: torch.Tensor, s_prev: Union[torch.Tensor, None] = None) -> \
+            Tuple[torch.Tensor, Union[torch.Tensor, None]]:
         """
         :param x: [batch, input_features]
         :param h_prev: [batch, hidden_features]
+        :param s_prev: None (not used)
         :return: [batch, hidden_features]
         """
         a = self.b + h_prev.matmul(self.W.t()) + x.matmul(self.U.t())
-        h = self.activation(a)
+        h = torch.tanh(a)
         if self.mode == 'elman':
-            return h
-        o = self.c + h.matmul(self.V.t())
-        return o
+            return h, None
+        o = torch.tanh(self.c + h.matmul(self.V.t()))
+        return o, None
 
 
 class VanillaRNN(BaseRNN):
@@ -38,22 +42,23 @@ class VanillaRNN(BaseRNN):
         :param mode: either Jordan or Elman"""
         assert mode in ['elman', 'jordan']
         self.mode = mode
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, cell=False, **kwargs)
 
     def _init_layers(self) -> torch.nn.ModuleList:
         """Stack of vanilla RNN layers"""
-        initial_layer = VanillaRNNLayer(self.input_features, self.hidden_features, self.activation, mode=self.mode)
+        initial_layer = VanillaRNNLayer(self.input_features, self.hidden_features, mode=self.mode)
         layers = [initial_layer]
         for i in range(1, self.n_layers):
             if self.dropout > 0:
                 layers.append(nn.Dropout(self.dropout))
-            layers.append(VanillaRNNLayer(self.hidden_features, self.hidden_features, self.activation, mode=self.mode))
+            layers.append(VanillaRNNLayer(self.hidden_features, self.hidden_features, mode=self.mode))
         layers = nn.ModuleList(layers)
         return layers
 
 
 if __name__ == '__main__':
     net = VanillaRNN(100, 64, 128, 3, mode='jordan')
-    x = torch.tensor([[9, 3], [4, 5], [1, 0]])
-    y = net(x)
+    x = torch.tensor([[1, 0], [9, 3], [4, 5]])
+    lengths = torch.tensor([1, 2, 2])
+    y = net(x, lengths)
     print(y)

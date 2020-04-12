@@ -1,15 +1,16 @@
 import torch.nn as nn
 import torch
 from rnn.utils import pack_right_padded_seq
-import torch.nn.functional as F
 import math
+from typing import Union
+from typing import Tuple
 
 
 class BinaryClassifier(nn.Module):
     def __init__(self, in_features: int):
         """
         MLP classifier with one hidden layer
-        :param in_features:
+        :param in_features: Input features
         """
         super().__init__()
         self.linear = nn.Linear(in_features, 1)
@@ -21,20 +22,17 @@ class BinaryClassifier(nn.Module):
 
 
 class BaseRNNLayer(nn.Module):
-    def __init__(self, input_features: int, hidden_features: int, activation: str = 'tanh'):
+    def __init__(self, input_features: int, hidden_features: int):
         """
         Base class for RNN layers
-        :param input_features:
-        :param hidden_features:
-        :param activation:
+        :param input_features: Input dims
+        :param hidden_features: Hidden dims
         """
         super().__init__()
         assert input_features > 0
         self.input_features = input_features
         assert hidden_features > 0
         self.hidden_features = hidden_features
-        assert activation in ['tanh', 'relu']
-        self.activation = torch.tanh if activation == 'tanh' else torch.relu
 
     def _reset_parameters(self):
         """
@@ -45,18 +43,21 @@ class BaseRNNLayer(nn.Module):
         for weight in self.parameters():
             torch.nn.init.uniform_(weight, -stdv, stdv)
 
-    def forward(self, x: torch.Tensor, h_prev: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, h_prev: torch.Tensor, s_prev: Union[torch.Tensor, None] = None) ->\
+            Tuple[torch.Tensor, Union[torch.Tensor, None]]:
         """
         :param x: [batch, input_features]
         :param h_prev: [batch, hidden_features]
-        :return: [batch, hidden_features]
+        :param s_prev: [batch, hidden_Features]: optional, only for gated RNNs having a cell state (self.cell).
+        :return: Tuple of tensors with shape [batch, hidden_features]. If s_prev is not used (vanilla RNN), tuple of
+        only one tensor, h, and None. If s_prev is used, the second element is s.
         """
         raise NotImplementedError()
 
 
 class BaseRNN(nn.Module):
     def __init__(self, vocab_size: int, embedding_dim: int, hidden_features: int, n_layers: int, dropout: float = 0.0,
-                 bidirectional: bool = False, activation: str = 'tanh'):
+                 bidirectional: bool = False, cell: bool = False):
         """
         Base class for RNN networks such that:
         - The input is a discrete sequence of tokens.
@@ -68,8 +69,7 @@ class BaseRNN(nn.Module):
         :param n_layers: Number of recurrent layers.
         :param dropout: Dropout probability, for for the classifier and the recurrent layers.
         :param bidirectional: Whether to use bidirectional RNNs (and concat the output of both directions).
-        :param activation: Activation function to be used in the recurrent layers (not in the classifier, which will
-        always be a sigmoid).
+        :param cell: Whether the network has an internal cell state.
         """
         super().__init__()
         assert vocab_size > 0
@@ -86,7 +86,7 @@ class BaseRNN(nn.Module):
         if self.dropout > 0:
             self.fc_dropout_layer = nn.Dropout(dropout)
         self.bidirectional = bidirectional
-        self.activation = activation
+        self.cell = cell
         self.layers = self._init_layers()
         if self.bidirectional:
             self.layers_reverse = self._init_layers()
@@ -116,24 +116,40 @@ class BaseRNN(nn.Module):
 
         done_batches = 0
         hidden = torch.zeros(bs, self.n_layers, self.hidden_features)
+        if self.cell:
+            cell = torch.zeros(bs, self.n_layers, self.hidden_features)
         for effective_batch_size in effective_batch_sizes:
             effective_batch = x[done_batches:effective_batch_size+done_batches]
             for idx, layer in enumerate(self.layers):
                 hidden_batch = hidden[:effective_batch_size, idx].clone()
-                effective_batch = layer(effective_batch, hidden_batch)
-                hidden[:effective_batch_size, idx] = effective_batch
+                if not self.cell:
+                    effective_batch, _ = layer(effective_batch, hidden_batch)
+                    hidden[:effective_batch_size, idx] = effective_batch
+                else:
+                    cell_batch = cell[:effective_batch_size, idx].clone()
+                    effective_batch, s = layer(effective_batch, hidden_batch, cell_batch)
+                    hidden[:effective_batch_size, idx] = effective_batch
+                    cell[:effective_batch_size, idx] = s
             done_batches += effective_batch_size
         x = hidden[:, -1]
 
         if self.bidirectional:
             done_batches = 0
             hidden = torch.zeros(bs, self.n_layers, self.hidden_features)
+            if self.cell:
+                cell = torch.zeros(bs, self.n_layers, self.hidden_features)
             for effective_batch_size in reverse_effective_batch_sizes:
                 effective_batch = reverse_x[done_batches:effective_batch_size + done_batches]
                 for idx, layer in enumerate(self.layers):
                     hidden_batch = hidden[:effective_batch_size, idx].clone()
-                    effective_batch = layer(effective_batch, hidden_batch)
-                    hidden[:effective_batch_size, idx] = effective_batch
+                    if not self.cell:
+                        effective_batch, _ = layer(effective_batch, hidden_batch)
+                        hidden[:effective_batch_size, idx] = effective_batch
+                    else:
+                        cell_batch = cell[:effective_batch_size, idx].clone()
+                        effective_batch = layer(effective_batch[0], hidden_batch, cell_batch)
+                        hidden[:effective_batch_size, idx] = effective_batch[0]
+                        cell[:effective_batch_size, idx] = effective_batch[1]
                 done_batches += effective_batch_size
             reverse_x = hidden[:, -1]
 
