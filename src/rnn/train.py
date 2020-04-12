@@ -49,7 +49,10 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
                 tgt = tgt.view(tgt.shape[0], 1)
                 # Teacher forcing
                 # TODO: not always ones in lengths, add counter
-                decoder_x, decoder_hidden, decoder_cell = decoder(tgt, torch.ones(tgt.shape[0]),
+                zero_idx = (tgt == 0).nonzero().t()[0]
+                transposed_lengths = torch.ones(args.batch_size).long()
+                transposed_lengths[zero_idx] = torch.zeros(zero_idx.shape).long()
+                decoder_x, decoder_hidden, decoder_cell = decoder(tgt, transposed_lengths.to(device),
                                                                   decoder_hidden.clone().to(device),
                                                                   decoder_cell.clone().to(device)
                                                                   if decoder_cell is not None else None)
@@ -142,7 +145,7 @@ def main():
     parser.add_argument('--embedding-size', type=int, help='Embedding size', default=64)
     parser.add_argument('--hidden-size', type=int, help='Hidden state size', default=128)
     parser.add_argument('--n-layers', type=int, help='Number of recurrent layers', default=1)
-    parser.add_argument('--bidrectional', action='store_true', help='Use bidirectional RNNs')
+    parser.add_argument('--bidirectional', action='store_true', help='Use bidirectional RNNs')
     args = parser.parse_args()
     init_train_logging()
 
