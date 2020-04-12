@@ -44,7 +44,7 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
             transposed_tgt_tokens = tgt_tokens.t()
             # Assuming <BOS> and <EOS> already present in tgt_tokens
             # For the loss and accuracy, we take into account <EOS>, but not <BOS>
-            batch_correct = torch.zeros(args.batch_size).long()
+            batch_correct = torch.zeros(args.batch_size).to(device).long()
             for tgt_idx, tgt in enumerate(transposed_tgt_tokens):
                 tgt = tgt.view(tgt.shape[0], 1)
                 # Teacher forcing
@@ -53,8 +53,7 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
                                                                   decoder_cell.clone().to(device) if decoder_cell is not None else
                                                                   None)
                 loss += criterion(decoder_x, transposed_tgt_tokens[tgt_idx+1])
-                batch_correct += torch.eq(torch.argmax(tgt), transposed_tgt_tokens[tgt_idx+1])
-                outputs.append(torch.argmax(tgt))
+                batch_correct += torch.eq(torch.argmax(decoder_x, dim=1), transposed_tgt_tokens[tgt_idx+1])
                 if tgt_idx == transposed_tgt_tokens.shape[0]-2:  # <EOS>
                     break
 
@@ -165,7 +164,10 @@ def main():
     logging.info('===> Building model')
     logging.info(args)
 
-    encoder, decoder = load_arch(args)
+    device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
+    encoder, decoder = load_arch(device, args)
+    encoder.to(device)
+    decoder.to(device)
 
     resume_info = dict(epoch=0, best_valid_metric=0.0, epochs_without_improvement=0)
 
