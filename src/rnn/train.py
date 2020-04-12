@@ -49,7 +49,7 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
             for tgt_idx, tgt in enumerate(transposed_tgt_tokens):
                 tgt = tgt.view(tgt.shape[0], 1)
                 # Teacher forcing
-                decoder_x, decoder_hidden, decoder_cell = decoder(tgt, torch.ones(tgt.shape[0]), decoder_hidden.clone(),
+                decoder_x, decoder_hidden, decoder_cell = decoder(tgt, torch.ones(tgt.shape[0]), decoder_hidden.clone().to(device),
                                                                   decoder_cell)  # TODO: not always ones in lengths, add counter
                 loss += criterion(decoder_x, transposed_tgt_tokens[tgt_idx+1])
                 batch_correct += torch.eq(torch.argmax(tgt), transposed_tgt_tokens[tgt_idx+1])
@@ -58,10 +58,10 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
                     break
 
             # Binary evaluation: either correct (exactly equal, character by character) or incorrect
-            #for tgt_idx, c in enumerate(batch_correct):
-            #    if c == tgt_lengths[tgt_idx]:
-            #        correct += 1
-            #total += tgt_tokens.size(0)
+            for tgt_idx, c in enumerate(batch_correct):
+               if c == tgt_lengths[tgt_idx]:
+                   correct += 1
+            total += tgt_tokens.size(0)
 
             loss.backward()
             optimizer_encoder.step()
@@ -73,42 +73,42 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
         writer.add_scalar('Avg-loss/train', loss_train/total, epoch+1)
         writer.add_scalar('Accuracy/train', accuracy, epoch + 1)
 
-        # valid step: TODO
-        correct = 0
-        total = 0
-        loss_val = 0
-        encoder.eval()
-        decoder.eval()
-        with torch.no_grad():
-            for data in valid_loader:
-                src_tokens, tgt_tokens, src_lengths, tgt_lengths = data[0].to(device), data[1].to(device), \
-                                                                   data[2].to(device), data[3].to(device)
-                outputs = model(src_tokens, src_lengths)
-                tgt_tokens = tgt_tokens.unsqueeze(1).float()
-                loss = criterion(outputs, tgt_tokens)
-                loss_val += loss
-                total += tgt_tokens.size(0)
-                predicted = torch.round(outputs.data)
-                correct += (predicted == tgt_tokens).sum().item()
-        accuracy = 100 * correct/total
-        logging.info(f'valid: avg_loss = {loss_val/total:.5f} | accuracy = {accuracy:.2f}')
-        writer.add_scalar('Avg-loss/valid', loss_val / total, epoch + 1)
-        writer.add_scalar('Accuracy/valid', accuracy, epoch + 1)
-
-        torch.save(model.state_dict(), 'checkpoint_last.pt')
-        if accuracy > best_valid_metric:
-            epochs_without_improvement = 0
-            best_valid_metric = accuracy
-            torch.save(model.state_dict(), 'checkpoint_best.pt')
-            logging.info(f'best valid accuracy: {accuracy:.2f}')
-        else:
-            epochs_without_improvement += 1
-            logging.info(f'best valid accuracy: {best_valid_metric:.2f}')
-            if args.early_stop != -1 and epochs_without_improvement == args.early_stop:
-                break
-        logging.info(f'{epochs_without_improvement} epochs without improvement in validation set')
-        with open('resume_info.json', 'w') as f:
-            json.dump(resume_info, f, indent=2)
+        # # valid step: TODO
+        # correct = 0
+        # total = 0
+        # loss_val = 0
+        # encoder.eval()
+        # decoder.eval()
+        # with torch.no_grad():
+        #     for data in valid_loader:
+        #         src_tokens, tgt_tokens, src_lengths, tgt_lengths = data[0].to(device), data[1].to(device), \
+        #                                                            data[2].to(device), data[3].to(device)
+        #         outputs = model(src_tokens, src_lengths)
+        #         tgt_tokens = tgt_tokens.unsqueeze(1).float()
+        #         loss = criterion(outputs, tgt_tokens)
+        #         loss_val += loss
+        #         total += tgt_tokens.size(0)
+        #         predicted = torch.round(outputs.data)
+        #         correct += (predicted == tgt_tokens).sum().item()
+        # accuracy = 100 * correct/total
+        # logging.info(f'valid: avg_loss = {loss_val/total:.5f} | accuracy = {accuracy:.2f}')
+        # writer.add_scalar('Avg-loss/valid', loss_val / total, epoch + 1)
+        # writer.add_scalar('Accuracy/valid', accuracy, epoch + 1)
+        #
+        # torch.save(model.state_dict(), 'checkpoint_last.pt')
+        # if accuracy > best_valid_metric:
+        #     epochs_without_improvement = 0
+        #     best_valid_metric = accuracy
+        #     torch.save(model.state_dict(), 'checkpoint_best.pt')
+        #     logging.info(f'best valid accuracy: {accuracy:.2f}')
+        # else:
+        #     epochs_without_improvement += 1
+        #     logging.info(f'best valid accuracy: {best_valid_metric:.2f}')
+        #     if args.early_stop != -1 and epochs_without_improvement == args.early_stop:
+        #         break
+        # logging.info(f'{epochs_without_improvement} epochs without improvement in validation set')
+        # with open('resume_info.json', 'w') as f:
+        #     json.dump(resume_info, f, indent=2)
 
     model = load_arch(args)
     model.load_state_dict(torch.load('checkpoint_best.pt'))
@@ -163,7 +163,10 @@ def main():
     logging.info('===> Building model')
     logging.info(args)
 
-    encoder, decoder = load_arch(args)
+    device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
+    encoder, decoder = load_arch(device, args)
+    encoder.to(device)
+    decoder.to(device)
 
     resume_info = dict(epoch=0, best_valid_metric=0.0, epochs_without_improvement=0)
 
@@ -184,10 +187,6 @@ def main():
     else:
         logging.error("Criterion not implemented")
         raise NotImplementedError()
-
-    device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
-    encoder.to(device)
-    decoder.to(device)
 
     logging.info('===> Training')
     train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_encoder, optimizer_decoder, criterion,

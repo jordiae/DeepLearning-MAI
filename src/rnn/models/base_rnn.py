@@ -56,7 +56,7 @@ class BaseRNNLayer(nn.Module):
 
 
 class BaseRNN(nn.Module):
-    def __init__(self, vocab_size: int, embedding_dim: int, hidden_features: int, n_layers: int, dropout: float = 0.0,
+    def __init__(self, device, vocab_size: int, embedding_dim: int, hidden_features: int, n_layers: int, dropout: float = 0.0,
                  bidirectional: bool = False, cell: bool = False):
         """
         Base class for RNN networks such that:
@@ -70,8 +70,10 @@ class BaseRNN(nn.Module):
         :param dropout: Dropout probability, for for the classifier and the recurrent layers.
         :param bidirectional: Whether to use bidirectional RNNs (and concat the output of both directions).
         :param cell: Whether the network has an internal cell state.
+        :param device: Device
         """
         super().__init__()
+        self.device = device
         assert vocab_size > 0
         self.vocab_size = vocab_size
         assert embedding_dim > 0
@@ -111,9 +113,9 @@ class BaseRNN(nn.Module):
         :return: Final hidden states. :return: Final hidden states of each layer: [batch, n_layers, hidden_features].
         """
         done_batches = 0
-        hidden = torch.zeros(bs, self.n_layers, self.hidden_features) if initial_hidden is None else initial_hidden
+        hidden = torch.zeros(bs, self.n_layers, self.hidden_features).to(self.device) if initial_hidden is None else initial_hidden
         if self.cell:
-            cell = torch.zeros(bs, self.n_layers, self.hidden_features) if initial_cell is None else initial_cell
+            cell = torch.zeros(bs, self.n_layers, self.hidden_features).to(self.device) if initial_cell is None else initial_cell
         for effective_batch_size in effective_batch_sizes:
             effective_batch = x[done_batches:effective_batch_size + done_batches]
             for idx, layer in enumerate(layers):
@@ -142,7 +144,7 @@ class BaseRNN(nn.Module):
         the final hidden and cell states from all layers, respectively.
         """
         bs = x.shape[0]
-        x, effective_batch_sizes = pack_right_padded_seq(x, lengths)
+        x, effective_batch_sizes = pack_right_padded_seq(x, lengths, self.device)
 
         x = self.embedding(x)
 
