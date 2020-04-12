@@ -40,12 +40,11 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
             decoder_hidden = encoder_hidden
             decoder_cell = encoder_cell
 
-            outputs = []
             loss = 0
             transposed_tgt_tokens = tgt_tokens.t()
             # Assuming <BOS> and <EOS> already present in tgt_tokens
             # For the loss and accuracy, we take into account <EOS>, but not <BOS>
-            batch_correct = 0
+            batch_correct = torch.zeros(args.batch_size).long()
             for tgt_idx, tgt in enumerate(transposed_tgt_tokens):
                 tgt = tgt.view(tgt.shape[0], 1)
                 # Teacher forcing
@@ -54,16 +53,15 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
                                                                   decoder_cell.clone() if decoder_cell is not None else
                                                                   None)
                 loss += criterion(decoder_x, transposed_tgt_tokens[tgt_idx+1])
-                batch_correct += torch.eq(torch.argmax(tgt), transposed_tgt_tokens[tgt_idx+1])
-                outputs.append(torch.argmax(tgt))
+                batch_correct += torch.eq(torch.argmax(decoder_x, dim=1), transposed_tgt_tokens[tgt_idx+1])
                 if tgt_idx == transposed_tgt_tokens.shape[0]-2:  # <EOS>
                     break
 
             # Binary evaluation: either correct (exactly equal, character by character) or incorrect
-            #for tgt_idx, c in enumerate(batch_correct):
-            #    if c == tgt_lengths[tgt_idx]:
-            #        correct += 1
-            #total += tgt_tokens.size(0)
+            for tgt_idx, c in enumerate(batch_correct):
+                if c == tgt_lengths[tgt_idx]:
+                    correct += 1
+            total += tgt_tokens.size(0)
 
             loss.backward()
             optimizer_encoder.step()
@@ -75,6 +73,7 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
         writer.add_scalar('Avg-loss/train', loss_train/total, epoch+1)
         writer.add_scalar('Accuracy/train', accuracy, epoch + 1)
 
+        continue
         # valid step: TODO
         correct = 0
         total = 0
