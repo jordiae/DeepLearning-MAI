@@ -49,8 +49,8 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
             for tgt_idx, tgt in enumerate(transposed_tgt_tokens):
                 tgt = tgt.view(tgt.shape[0], 1)
                 # Teacher forcing
-                decoder_x, decoder_hidden, decoder_cell = decoder(tgt, torch.ones(tgt.shape[0]), decoder_hidden,
-                                                                  decoder_cell)
+                decoder_x, decoder_hidden, decoder_cell = decoder(tgt, torch.ones(tgt.shape[0]), decoder_hidden.clone(),
+                                                                  decoder_cell)  # TODO: not always ones in lengths, add counter
                 loss += criterion(decoder_x, transposed_tgt_tokens[tgt_idx+1])
                 batch_correct += torch.eq(torch.argmax(tgt), transposed_tgt_tokens[tgt_idx+1])
                 outputs.append(torch.argmax(tgt))
@@ -58,10 +58,10 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
                     break
 
             # Binary evaluation: either correct (exactly equal, character by character) or incorrect
-            for tgt_idx, c in enumerate(batch_correct):
-                if c == tgt_lengths[tgt_idx]:
-                    correct += 1
-            total += tgt_tokens.size(0)
+            #for tgt_idx, c in enumerate(batch_correct):
+            #    if c == tgt_lengths[tgt_idx]:
+            #        correct += 1
+            #total += tgt_tokens.size(0)
 
             loss.backward()
             optimizer_encoder.step()
