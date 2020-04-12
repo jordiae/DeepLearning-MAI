@@ -99,6 +99,14 @@ class BaseRNN(nn.Module):
 
     def _forward(self, x: torch.Tensor, layers: torch.nn.ModuleList, bs: int, effective_batch_sizes: torch.Tensor) ->\
             torch.Tensor:
+        """
+        Auxiliar method for computing the forward pass of a RNN network (it will be called twice if it is bidirectional)
+        :param x: Input tokens, already packed passed through the embedding layer.
+        :param layers: Layers of the network.
+        :param bs: Batch size.
+        :param effective_batch_sizes: Effective batch sizes due to packing.
+        :return: Final hidden states.
+        """
         done_batches = 0
         hidden = torch.zeros(bs, self.n_layers, self.hidden_features)
         if self.cell:
