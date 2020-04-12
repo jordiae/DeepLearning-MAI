@@ -52,8 +52,8 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
                 decoder_x, decoder_hidden, decoder_cell = decoder(tgt, torch.ones(tgt.shape[0]),
                                                                   decoder_hidden.clone().to(device),
                                                                   decoder_cell.clone().to(device)
-                                                                  if decoder_cell is not None else
-                                                                  None)
+                                                                  if decoder_cell is not None else None)
+
                 loss += criterion(decoder_x, transposed_tgt_tokens[tgt_idx+1])
                 batch_correct += torch.eq(torch.argmax(tgt), transposed_tgt_tokens[tgt_idx+1])
                 outputs.append(torch.argmax(tgt))
