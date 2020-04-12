@@ -5,4 +5,3 @@ data/mathematics/*
 experiments/*
 *.pyc
 __pycache__
-experiments/*
