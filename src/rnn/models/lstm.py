@@ -46,7 +46,7 @@ class LSTMLayer(BaseRNNLayer):
         g = torch.sigmoid(self.bg + x.matmul(self.Ug.t()) + h_prev.matmul(self.Wg.t()))
 
         # Self-loop, s. torch's implementation uses tanh, but the Deep Learning book suggests sigmoid
-        s = f * s_prev + g * torch.sigmoid(self.b + x.matmul(self.U.t()) + h_prev.matmul(self.W.t()))
+        s = f * s_prev + g * torch.tanh(self.b + x.matmul(self.U.t()) + h_prev.matmul(self.W.t()))
 
         # Output gate, q
 
