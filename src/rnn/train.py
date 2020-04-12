@@ -43,30 +43,37 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
             outputs = []
             loss = 0
             transposed_tgt_tokens = tgt_tokens.t()
-            for idx, tgt in enumerate(transposed_tgt_tokens):
+            # Assuming <BOS> and <EOS> already present in tgt_tokens
+            # For the loss and accuracy, we take into account <EOS>, but not <BOS>
+            batch_correct = 0
+            for tgt_idx, tgt in enumerate(transposed_tgt_tokens):
                 tgt = tgt.view(tgt.shape[0], 1)
                 # Teacher forcing
                 decoder_x, decoder_hidden, decoder_cell = decoder(tgt, torch.ones(tgt.shape[0]), decoder_hidden,
                                                                   decoder_cell)
-                if EOS: break
-                loss += criterion(decoder_x, transposed_tgt_tokens[idx+1])
-                outputs.append(tgt)
+                loss += criterion(decoder_x, transposed_tgt_tokens[tgt_idx+1])
+                batch_correct += torch.eq(torch.argmax(tgt), transposed_tgt_tokens[tgt_idx+1])
+                outputs.append(torch.argmax(tgt))
+                if tgt_idx == transposed_tgt_tokens.shape[0]-2:  # <EOS>
+                    break
 
+            # Binary evaluation: either correct (exactly equal, character by character) or incorrect
+            for tgt_idx, c in enumerate(batch_correct):
+                if c == tgt_lengths[tgt_idx]:
+                    correct += 1
             total += tgt_tokens.size(0)
-            predicted = torch.round(outputs.data)
-            tgt_tokens = tgt_tokens.unsqueeze(1).float()
-            correct += (predicted == tgt_tokens).sum().item()
-            loss = criterion(outputs, tgt_tokens)
+
             loss.backward()
             optimizer_encoder.step()
             optimizer_decoder.step()
             loss_train += loss.item()
+
         accuracy = 100 * correct / total
         logging.info(f'train: avg_loss = {loss_train/total:.5f} | accuracy = {accuracy:.2f}')
         writer.add_scalar('Avg-loss/train', loss_train/total, epoch+1)
         writer.add_scalar('Accuracy/train', accuracy, epoch + 1)
 
-        # valid step
+        # valid step: TODO
         correct = 0
         total = 0
         loss_val = 0

@@ -48,7 +48,7 @@ class MathDataset(Dataset):
         self.Y = []
         self.lower = lower
         self.sorted = False
-        self.answer_token = '<ANSWER>'
+        self.bos_token = '<BOS>'
         self.eos_token = '<EOS>'
         self.problem_types = problem_types if problem_types is not None else os.listdir(path)
         self.n_lines_problem = int(total_lines / len(self.problem_types))
@@ -93,9 +93,6 @@ class MathDataset(Dataset):
                                 if c not in self.token2idx:
                                     c = self.unk_token
                             x.append(self.token2idx[c])
-                        if subset == 'train':
-                            self.__add_token(self.answer_token)
-                        x.append(self.token2idx[self.answer_token])
                         self.X.append(x)
                         self.src_lengths.append(len(x))
                     else:
@@ -103,6 +100,9 @@ class MathDataset(Dataset):
                             idx_x += 1
                             continue
                         y = []
+                        if subset == 'train':
+                            self.__add_token(self.bos_token)
+                        y.append(self.token2idx[self.bos_token])
                         for c in line:
                             if c == '\n':
                                 break
@@ -144,7 +144,7 @@ class MathDataset(Dataset):
         :return:
         """
         assert self.subset == 'train'
-        assert len(c) == 1 or c == self.eos_token or c == self.answer_token
+        assert len(c) == 1 or c == self.eos_token or c == self.bos_token
         if c in self.token2idx:
             return
         self.idx2token.append(c)
