@@ -188,16 +188,3 @@ class Decoder(nn.Module):
         x, hidden, cell = self.net(tgt_tokens, tgt_lengths, initial_hidden, initial_cell)
         x = self.softmax(x)
         return x, hidden, cell
-
-
-class Seq2Seq:
-    def __init__(self, encoder: nn.Module, decoder: nn.Module):
-        """
-        Class for encapsulating encoder and decoder.
-        :param encoder:
-        :param decoder:
-        """
-        assert encoder.hidden_features == decoder.hidden_features
-        assert encoder.n_layers == decoder.n_layers
-        self.encoder = encoder
-        self.decoder = decoder
