@@ -4,3 +4,4 @@ data/mit67/*
 data/mathematics/*
 *.pyc
 __pycache__
+experiments/*
