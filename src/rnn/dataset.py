@@ -70,8 +70,8 @@ class MathDataset(Dataset):
                 return True
             return False
 
-        self.lengths = []
-        self.tgt_tokens_lengths = []
+        self.src_lengths = []
+        self.tgt_lengths = []
         for prob_id, problem_type in tqdm(enumerate(self.problem_types), total=len(self.problem_types)):
             with open(os.path.join(path, problem_type), 'r') as f:
                 idx_x = 0
@@ -97,7 +97,7 @@ class MathDataset(Dataset):
                             self.__add_token(self.answer_token)
                         x.append(self.token2idx[self.answer_token])
                         self.X.append(x)
-                        self.lengths.append(len(x))
+                        self.src_lengths.append(len(x))
                     else:
                         if not check_idx(idx_x, self.subset):
                             idx_x += 1
@@ -117,8 +117,7 @@ class MathDataset(Dataset):
                             self.__add_token(self.eos_token)
                         y.append(self.token2idx[self.eos_token])
                         self.Y.append(y)
-                        self.tgt_tokens_lengths.append(len(y))
-                        self.lengths[-1] += len(y)
+                        self.tgt_lengths.append(len(y))
                         idx_x += 1
         assert len(self.X) == len(self.Y)
         self.data_len = len(self.X)
@@ -126,7 +125,7 @@ class MathDataset(Dataset):
             self._sort_by_lengths()
 
     def __getitem__(self, index: int) -> Tuple[List[int], List[int], int, int]:
-        return self.X[index], self.Y[index], self.lengths[index], self.tgt_tokens_lengths[index]
+        return self.X[index], self.Y[index], self.src_lengths[index], self.tgt_lengths[index]
 
     def __len__(self) -> int:
         return self.data_len
@@ -158,11 +157,11 @@ class MathDataset(Dataset):
         """
         assert len(self.X) > 0
         assert not self.sorted
-        sorted_idx = np.argsort(self.lengths)
+        sorted_idx = np.argsort(self.src_lengths)
         self.X = [self.X[i] for i in sorted_idx]
         self.Y = [self.Y[i] for i in sorted_idx]
-        self.lengths = [self.lengths[i] for i in sorted_idx]
-        self.tgt_tokens_lengths = [self.tgt_tokens_lengths[i] for i in sorted_idx]
+        self.src_lengths = [self.src_lengths[i] for i in sorted_idx]
+        self.tgt_lengths = [self.tgt_lengths[i] for i in sorted_idx]
         self.sorted = True
 
     def sort_by_lengths(self):
@@ -182,23 +181,23 @@ class MathDataset(Dataset):
 def pad_collate(data: Tuple[List[List[int]], List[List[int]], List[int], List[int]]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
 
-    :param data: a tuple (sequences, labels of sequences, lengths of sequences, lengths of labels)
+    :param data: a tuple (source sequences, target sequences, lengths of source sequences, lengths of target sequences)
     :return: a right-padded, tensorized version of the aforementioned tuple
     """
     # See: https://discuss.pytorch.org/t/how-to-create-batches-of-a-list-of-varying-dimension-tensors/50773/14
-    inputs, tgt_tokens, lengths, tgt_tokens_lengths = zip(*data)
-    longest_seq_len = max(lengths)
-    padded_inputs = torch.zeros((len(data), longest_seq_len)).long()
-    longest_tgt_len = max(tgt_tokens_lengths)
+    src_tokens, tgt_tokens, src_lengths, tgt_lengths = zip(*data)
+    longest_src_len = max(src_lengths)
+    padded_inputs = torch.zeros((len(data), longest_src_len)).long()
+    longest_tgt_len = max(tgt_lengths)
     padded_tgt_tokens = torch.zeros((len(data), longest_tgt_len)).long()
-    lengths = torch.tensor(lengths)
-    tgt_tokens_lengths = torch.tensor(tgt_tokens_lengths)
+    src_lengths = torch.tensor(src_lengths)
+    tgt_lengths = torch.tensor(tgt_lengths)
     for i in range(len(data)):
         len_seq = len(data[i][0])
-        padded_inputs[i] = torch.cat([torch.tensor(data[i][0]).long(), torch.zeros((longest_seq_len - len_seq)).long()])
+        padded_inputs[i] = torch.cat([torch.tensor(src_tokens[i]).long(), torch.zeros((longest_src_len - len_seq)).long()])
         len_tgt = len(data[i][1])
-        padded_tgt_tokens[i] = torch.cat([torch.tensor(data[i][1]).long(), torch.zeros((longest_tgt_len - len_tgt)).long()])
-    return padded_inputs.long(), padded_tgt_tokens.long(), lengths.long(), tgt_tokens_lengths.long()
+        padded_tgt_tokens[i] = torch.cat([torch.tensor(tgt_tokens[i]).long(), torch.zeros((longest_tgt_len - len_tgt)).long()])
+    return padded_inputs.long(), padded_tgt_tokens.long(), src_lengths.long(), tgt_lengths.long()
 
 
 class SortedRandomSampler(RandomSampler):
@@ -230,7 +229,7 @@ class SortedRandomSampler(RandomSampler):
 
         if self.mode in ['strict_shuffle', 'non_strict_shuffle']:
             if self.mode == 'strict_shuffle':
-                length_chunks = self.unique_indexes(self.data_source.lengths)
+                length_chunks = self.unique_indexes(self.data_source.src_lengths)
                 length_chunks.append(n)
             else:
                 length_chunks = list(range(0, n+1, int(n/self.n_chunks)))
@@ -306,6 +305,6 @@ if __name__ == '__main__':
 
     dataloader = SortedShufflingDataLoader(train_dataset, mode='strict_shuffle', batch_size=10)
     for batch in dataloader:
-        input_, tgt_tokens, lengths, tgt_tokens_lengths = batch
-        print(input_.shape, tgt_tokens.shape, lengths.shape, tgt_tokens_lengths.shape)
+        src_tokens, tgt_tokens, src_lengths, tgt_lengths = batch
+        print(src_tokens.shape, tgt_tokens.shape, src_lengths.shape, tgt_lengths.shape)
         break

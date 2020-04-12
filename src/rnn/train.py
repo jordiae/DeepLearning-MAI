@@ -29,14 +29,15 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
         for idx, data in enumerate(train_loader):
             if (idx+1) % 10 == 0:
                 logging.info(f'{idx+1}/{len(train_loader)} batches')
-            inputs, labels, lengths = data[0].to(device), data[1].to(device), data[2].to(device)
+            src_tokens, tgt_tokens, src_lengths, tgt_lengths = data[0].to(device), data[1].to(device), \
+                                                               data[2].to(device), data[3].to(device)
             optimizer.zero_grad()
-            outputs = model(inputs, lengths)
-            total += labels.size(0)
+            outputs = model(src_tokens, src_lengths)
+            total += tgt_tokens.size(0)
             predicted = torch.round(outputs.data)
-            labels = labels.unsqueeze(1).float()
-            correct += (predicted == labels).sum().item()
-            loss = criterion(outputs, labels)
+            tgt_tokens = tgt_tokens.unsqueeze(1).float()
+            correct += (predicted == tgt_tokens).sum().item()
+            loss = criterion(outputs, tgt_tokens)
             loss.backward()
             optimizer.step()
             loss_train += loss.item()
@@ -52,14 +53,15 @@ def train(args, train_loader, valid_loader, model, device, optimizer, criterion,
         model.eval()
         with torch.no_grad():
             for data in valid_loader:
-                inputs, labels, lengths = data[0].to(device), data[1].to(device), data[2].to(device)
-                outputs = model(inputs, lengths)
-                labels = labels.unsqueeze(1).float()
-                loss = criterion(outputs, labels)
+                src_tokens, tgt_tokens, src_lengths, tgt_lengths = data[0].to(device), data[1].to(device), \
+                                                                   data[2].to(device), data[3].to(device)
+                outputs = model(src_tokens, src_lengths)
+                tgt_tokens = tgt_tokens.unsqueeze(1).float()
+                loss = criterion(outputs, tgt_tokens)
                 loss_val += loss
-                total += labels.size(0)
+                total += tgt_tokens.size(0)
                 predicted = torch.round(outputs.data)
-                correct += (predicted == labels).sum().item()
+                correct += (predicted == tgt_tokens).sum().item()
         accuracy = 100 * correct/total
         logging.info(f'valid: avg_loss = {loss_val/total:.5f} | accuracy = {accuracy:.2f}')
         writer.add_scalar('Avg-loss/valid', loss_val / total, epoch + 1)
