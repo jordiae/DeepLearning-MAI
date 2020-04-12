@@ -5,7 +5,7 @@ import os
 import logging
 
 
-def load_arch(args: argparse.Namespace) -> Tuple[torch.nn.Module, torch.nn.Module]:
+def load_arch(device, args: argparse.Namespace) -> Tuple[torch.nn.Module, torch.nn.Module]:
     """
     Returns initialized Seq2seq model.
     :param args: Arguments from argparse.
@@ -13,33 +13,33 @@ def load_arch(args: argparse.Namespace) -> Tuple[torch.nn.Module, torch.nn.Modul
     """
     from rnn.models import VanillaRNN, LSTM, GRU, Decoder
     if args.arch == 'elman':
-        encoder = VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+        encoder = VanillaRNN(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                              hidden_features=args.hidden_size, n_layers=args.n_layers, mode='elman')
-        decoder = Decoder(VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+        decoder = Decoder(VanillaRNN(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                                      hidden_features=args.hidden_size, n_layers=args.n_layers, mode='elman'),
                           args.vocab_size)
     elif args.arch == 'jordan':
-        encoder = VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+        encoder = VanillaRNN(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                              hidden_features=args.hidden_size, n_layers=args.n_layers, mode='jordan')
-        decoder = Decoder(VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+        decoder = Decoder(VanillaRNN(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                                      hidden_features=args.hidden_size, n_layers=args.n_layers, mode='jordan'),
                           args.vocab_size)
     elif args.arch == 'lstm':
-        encoder = LSTM(vocab_size=args.vocab_size, embedding_dim=args.embedding_size, hidden_features=args.hidden_size,
+        encoder = LSTM(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size, hidden_features=args.hidden_size,
                        n_layers=args.n_layers)
-        decoder = Decoder(LSTM(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+        decoder = Decoder(LSTM(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                                hidden_features=args.hidden_size, n_layers=args.n_layers), args.vocab_size)
     elif args.arch == 'gru':
-        encoder = GRU(vocab_size=args.vocab_size, embedding_dim=args.embedding_size, hidden_features=args.hidden_size,
+        encoder = GRU(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size, hidden_features=args.hidden_size,
                       n_layers=args.n_layers)
-        decoder = Decoder(GRU(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+        decoder = Decoder(GRU(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                               hidden_features=args.hidden_size, n_layers=args.n_layers), args.vocab_size)
     else:
         raise NotImplementedError()
     return encoder, decoder
 
 
-def pack_right_padded_seq(seqs: torch.Tensor, lengths: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+def pack_right_padded_seq(seqs: torch.Tensor, lengths: torch.Tensor, device) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Function for packing a right-padded sequence, inspired by the functionality of
     torch.nn.utils.rnn.pack_padded_sequence.
@@ -50,6 +50,7 @@ def pack_right_padded_seq(seqs: torch.Tensor, lengths: torch.Tensor) -> Tuple[to
     lengths is used to verify that the sequence are ordered by length.
     :param seqs: [batch, right-padded tokens]
     :param lengths: [batch]
+    :param device: device
     :return: ([packed tokens], [effective batch sizes])
     """
     prev = lengths[0]
@@ -59,7 +60,7 @@ def pack_right_padded_seq(seqs: torch.Tensor, lengths: torch.Tensor) -> Tuple[to
         else:
             prev = l
     effective_batch_sizes = (seqs != 0).sum(dim=0)
-    seqs = torch.cat((seqs, torch.zeros(seqs.shape[0], 1).long()), dim=-1)
+    seqs = torch.cat((seqs, torch.zeros(seqs.shape[0], 1).to(device).long()), dim=-1)
     seqs = seqs.permute(-1, 0).reshape(seqs.shape[0] * seqs.shape[1])  # [batch, tokens] -> [batch*tokens]
     non_pad_idx = (seqs != 0).nonzero().flatten()
     seqs = seqs[non_pad_idx]

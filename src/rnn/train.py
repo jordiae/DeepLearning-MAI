@@ -49,11 +49,12 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
                 tgt = tgt.view(tgt.shape[0], 1)
                 # Teacher forcing
                 # TODO: not always ones in lengths, add counter
-                decoder_x, decoder_hidden, decoder_cell = decoder(tgt, torch.ones(tgt.shape[0]), decoder_hidden.clone(),
-                                                                  decoder_cell.clone() if decoder_cell is not None else
+                decoder_x, decoder_hidden, decoder_cell = decoder(tgt, torch.ones(tgt.shape[0]), decoder_hidden.clone().to(device),
+                                                                  decoder_cell.clone().to(device) if decoder_cell is not None else
                                                                   None)
                 loss += criterion(decoder_x, transposed_tgt_tokens[tgt_idx+1])
-                batch_correct += torch.eq(torch.argmax(decoder_x, dim=1), transposed_tgt_tokens[tgt_idx+1])
+                batch_correct += torch.eq(torch.argmax(tgt), transposed_tgt_tokens[tgt_idx+1])
+                outputs.append(torch.argmax(tgt))
                 if tgt_idx == transposed_tgt_tokens.shape[0]-2:  # <EOS>
                     break
 
@@ -185,10 +186,6 @@ def main():
     else:
         logging.error("Criterion not implemented")
         raise NotImplementedError()
-
-    device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
-    encoder.to(device)
-    decoder.to(device)
 
     logging.info('===> Training')
     train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_encoder, optimizer_decoder, criterion,
