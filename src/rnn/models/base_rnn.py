@@ -175,59 +175,29 @@ class BaseRNN(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self, net: nn.Module, vocab_size: int):
+        """
+        Wrapper around BaseRNN for adding a softmax layer.
+        :param net: BaseRNN instance
+        :param vocab_size:  Vocabulary size
+        """
         super(Decoder, self).__init__()
         self.net = net
         self.softmax = nn.LogSoftmax(dim=vocab_size)
 
-    def forward(self, tgt_tokens, tgt_lengths, initial_hidden):
-        x, _, _ = self.net(tgt_tokens, tgt_lengths, initial_hidden)
+    def forward(self, tgt_tokens, tgt_lengths, initial_hidden, initial_cell):
+        x, hidden, cell = self.net(tgt_tokens, tgt_lengths, initial_hidden, initial_cell)
         x = self.softmax(x)
-        return x
+        return x, hidden, cell
 
 
-class Seq2Seq(nn.Module):
+class Seq2Seq:
     def __init__(self, encoder: nn.Module, decoder: nn.Module):
-        super(Seq2Seq, self).__init__()
+        """
+        Class for encapsulating encoder and decoder.
+        :param encoder:
+        :param decoder:
+        """
         assert encoder.hidden_features == decoder.hidden_features
         assert encoder.n_layers == decoder.n_layers
         self.encoder = encoder
         self.decoder = decoder
-
-    def forward(self, src_tokens, src_lengths, tgt_tokens=None, tgt_lengths=None):
-        _, hidden, cell = self.encoder(src_tokens, src_lengths)
-        x = self.decoder(tgt_tokens, tgt_lengths, hidden, cell)
-        return x
-
-
-def build_model(args: argparse.Namespace) -> nn.Module:
-    """
-    Returns initialized Seq2seq model.
-    :param args: Arguments from argparse.
-    :return: Initialized model
-    """
-    if args.arch == 'elman':
-        encoder = VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
-                             hidden_features=args.hidden_size, n_layers=args.n_layers, mode='elman')
-        decoder = Decoder(VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
-                                     hidden_features=args.hidden_size, n_layers=args.n_layers, mode='elman'),
-                          args.vocab_size)
-    elif args.arch == 'jordan':
-        encoder = VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
-                             hidden_features=args.hidden_size, n_layers=args.n_layers, mode='jordan')
-        decoder = Decoder(VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
-                                     hidden_features=args.hidden_size, n_layers=args.n_layers, mode='jordan'),
-                          args.vocab_size)
-    elif args.arch == 'lstm':
-        encoder = LSTM(vocab_size=args.vocab_size, embedding_dim=args.embedding_size, hidden_features=args.hidden_size,
-                       n_layers=args.n_layers)
-        decoder = Decoder(LSTM(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
-                               hidden_features=args.hidden_size, n_layers=args.n_layers), args.vocab_size)
-    elif args.arch == 'gru':
-        encoder = GRU(vocab_size=args.vocab_size, embedding_dim=args.embedding_size, hidden_features=args.hidden_size,
-                      n_layers=args.n_layers)
-        decoder = Decoder(GRU(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
-                              hidden_features=args.hidden_size, n_layers=args.n_layers), args.vocab_size)
-    else:
-        raise NotImplementedError()
-    return Seq2Seq(encoder, decoder)
-

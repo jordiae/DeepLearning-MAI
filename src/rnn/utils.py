@@ -5,10 +5,38 @@ import os
 import logging
 
 
-def load_arch(args: argparse.Namespace) -> torch.nn.Module:
-    from rnn.models import build_model
-    model = build_model(args)
-    return model
+def load_arch(args: argparse.Namespace) -> object:
+    """
+    Returns initialized Seq2seq model.
+    :param args: Arguments from argparse.
+    :return: Initialized model
+    """
+    from rnn.models import Seq2Seq, VanillaRNN, LSTM, GRU, Decoder
+    if args.arch == 'elman':
+        encoder = VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+                             hidden_features=args.hidden_size, n_layers=args.n_layers, mode='elman')
+        decoder = Decoder(VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+                                     hidden_features=args.hidden_size, n_layers=args.n_layers, mode='elman'),
+                          args.vocab_size)
+    elif args.arch == 'jordan':
+        encoder = VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+                             hidden_features=args.hidden_size, n_layers=args.n_layers, mode='jordan')
+        decoder = Decoder(VanillaRNN(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+                                     hidden_features=args.hidden_size, n_layers=args.n_layers, mode='jordan'),
+                          args.vocab_size)
+    elif args.arch == 'lstm':
+        encoder = LSTM(vocab_size=args.vocab_size, embedding_dim=args.embedding_size, hidden_features=args.hidden_size,
+                       n_layers=args.n_layers)
+        decoder = Decoder(LSTM(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+                               hidden_features=args.hidden_size, n_layers=args.n_layers), args.vocab_size)
+    elif args.arch == 'gru':
+        encoder = GRU(vocab_size=args.vocab_size, embedding_dim=args.embedding_size, hidden_features=args.hidden_size,
+                      n_layers=args.n_layers)
+        decoder = Decoder(GRU(vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+                              hidden_features=args.hidden_size, n_layers=args.n_layers), args.vocab_size)
+    else:
+        raise NotImplementedError()
+    return Seq2Seq(encoder, decoder)
 
 
 def pack_right_padded_seq(seqs: torch.Tensor, lengths: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
