@@ -4,8 +4,6 @@ from rnn.utils import pack_right_padded_seq
 import math
 from typing import Union
 from typing import Tuple
-import argparse
-from rnn.models import VanillaRNN, LSTM, GRU
 
 
 class BinaryClassifier(nn.Module):
