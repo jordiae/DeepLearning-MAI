@@ -3,10 +3,10 @@ from typing import Tuple
 import argparse
 import os
 import logging
-from rnn.models import build_model
 
 
 def load_arch(args: argparse.Namespace) -> torch.nn.Module:
+    from rnn.models import build_model
     model = build_model(args)
     return model
 
