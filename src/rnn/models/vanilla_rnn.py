@@ -65,6 +65,6 @@ if __name__ == '__main__':
     net2 = VanillaRNN(torch.device('cpu'), 100, 64, 128, 1, mode='jordan')
     decoder = Decoder(net2, 100)
     t = torch.tensor([[1], [9], [4]])
-    l = torch.tensor([[1], [1], [1]])
-    decoder_x, decoder_hidden, _ = decoder(t, l, encoder_hidden, None)
+    tl = torch.tensor([[1], [1], [1]])
+    decoder_x, decoder_hidden, _ = decoder(t, tl, encoder_hidden, None)
     print(decoder_x)

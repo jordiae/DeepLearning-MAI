@@ -6,21 +6,6 @@ from typing import Union
 from typing import Tuple
 
 
-class BinaryClassifier(nn.Module):
-    def __init__(self, in_features: int):
-        """
-        MLP classifier with one hidden layer
-        :param in_features: Input features
-        """
-        super().__init__()
-        self.linear = nn.Linear(in_features, 1)
-
-    def forward(self, x):
-        x = self.linear(x)
-        x = torch.sigmoid(x)
-        return x
-
-
 class BaseRNNLayer(nn.Module):
     def __init__(self, input_features: int, hidden_features: int):
         """
@@ -92,7 +77,6 @@ class BaseRNN(nn.Module):
         self.layers = self._init_layers()
         if self.bidirectional:
             self.layers_reverse = self._init_layers()
-        self.classifier = BinaryClassifier(hidden_features if not self.bidirectional else hidden_features*2)
 
     def _init_layers(self) -> torch.nn.ModuleList:
         """Instantiate recurrent layers. To be implemented by each subclass. Dropout should be placed between RNN
@@ -153,7 +137,7 @@ class BaseRNN(nn.Module):
         the final hidden and cell states from all layers, respectively.
         """
         bs = x.shape[0]
-        x, effective_batch_sizes, sort_idx = pack_right_padded_seq(x, lengths, self.device)
+        x, effective_batch_sizes = pack_right_padded_seq(x, lengths, self.device)
 
         x = self.embedding(x)
 
@@ -164,23 +148,12 @@ class BaseRNN(nn.Module):
             reverse_effective_batch_sizes = torch.flip(reverse_effective_batch_sizes, dims=(-1, ))
             if initial_hidden is not None:
                 initial_hidden, reverse_initial_hidden = torch.unbind(initial_hidden)
-                if sort_idx is not None:
-                    initial_hidden = initial_hidden[sort_idx]
-                    reverse_initial_hidden = reverse_initial_hidden[sort_idx]
             else:
                 reverse_initial_hidden = None
             if initial_cell is not None:
                 initial_cell, reverse_initial_cell = torch.unbind(initial_cell)
-                if sort_idx is not None:
-                    initial_cell = initial_cell[sort_idx]
-                    reverse_initial_cell = reverse_initial_cell[sort_idx]
             else:
                 reverse_initial_cell = None
-        else:
-            if sort_idx is not None:
-                initial_hidden = initial_hidden[sort_idx]
-                if initial_cell is not None:
-                    initial_cell = initial_cell[sort_idx]
 
         hidden, cell = self._forward(x, self.layers, bs, effective_batch_sizes, initial_hidden, initial_cell)
         x = hidden[:, -1]
@@ -194,28 +167,21 @@ class BaseRNN(nn.Module):
                 cell = torch.stack((cell, reverse_cell))
             x = torch.cat((x, reverse_x), dim=-1)
 
-        if sort_idx is not None:
-            x = x[sort_idx]
-            hidden = hidden[sort_idx]
-            if self.cell:
-                cell = cell[sort_idx]
         return x, hidden, None if not self.cell else cell
 
 
 class Decoder(nn.Module):
     def __init__(self, net: nn.Module, vocab_size: int):
         """
-        Wrapper around BaseRNN for adding a softmax layer.
+        Wrapper around BaseRNN for adding a projection layer.
         :param net: BaseRNN instance
         :param vocab_size:  Vocabulary size
         """
         super(Decoder, self).__init__()
         self.net = net
         self.linear = nn.Linear(net.hidden_features * 2 if net.bidirectional else net.hidden_features, vocab_size)
-        #self.softmax = nn.LogSoftmax(dim=0)
 
     def forward(self, tgt_tokens, tgt_lengths, initial_hidden, initial_cell):
         x, hidden, cell = self.net(tgt_tokens, tgt_lengths, initial_hidden, initial_cell)
         x = self.linear(x)
-        #x = self.softmax(x)
         return x, hidden, cell
