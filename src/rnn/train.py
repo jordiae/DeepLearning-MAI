@@ -113,6 +113,10 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
                 src_tokens, tgt_tokens, src_lengths, tgt_lengths = data[0].to(device), data[1].to(device), \
                                                                    data[2].to(device), data[3].to(device)
 
+                encoder_x, encoder_hidden, encoder_cell = encoder(src_tokens, src_lengths)
+                decoder_hidden = encoder_hidden
+                decoder_cell = encoder_cell
+
                 transposed_tgt_tokens = tgt_tokens.t()
                 # Assuming <BOS> and <EOS> already present in tgt_tokens
                 # For the loss and accuracy, we take into account <EOS>, but not <BOS>
@@ -186,7 +190,7 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
     decoder.to(device)
     # TODO: Evaluate
     # eval_res = evaluate(valid_loader, encoder, decoder, device)
-    logging.info(prettify_eval('train', *eval_res))
+    #logging.info(prettify_eval('train', *eval_res))
 
 
 def main():
