@@ -13,7 +13,7 @@ import numpy as np
 
 
 def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_encoder, optimizer_decoder, criterion,
-          resume_info, seed=42):
+          resume_info, dataset, seed=42):
     torch.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
@@ -42,7 +42,7 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
                                                                data[2].to(device), data[3].to(device)
             optimizer_encoder.zero_grad()
             optimizer_decoder.zero_grad()
-            _, encoder_hidden, encoder_cell = encoder(src_tokens, src_lengths)
+            encoder_x, encoder_hidden, encoder_cell = encoder(src_tokens, src_lengths)
             decoder_hidden = encoder_hidden
             decoder_cell = encoder_cell
 
@@ -51,20 +51,29 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
             # Assuming <BOS> and <EOS> already present in tgt_tokens
             # For the loss and accuracy, we take into account <EOS>, but not <BOS>
             batch_correct = torch.zeros(args.batch_size).to(device).long()
+            transposed_lengths = torch.ones(args.batch_size).long().to(device)
+            decoder_x = torch.zeros(args.batch_size, args.vocab_size).to(device)
             for tgt_idx, tgt in enumerate(transposed_tgt_tokens):
                 tgt = tgt.view(tgt.shape[0], 1)
-                # Teacher forcing
-                # TODO: not always ones in lengths, add counter
-                zero_idx = (tgt == 0).nonzero().t()[0]
-                transposed_lengths = torch.ones(args.batch_size).long()
-                transposed_lengths[zero_idx] = torch.zeros(zero_idx.shape).long()
-                decoder_x, decoder_hidden, decoder_cell = decoder(tgt, transposed_lengths.to(device),
-                                                                  decoder_hidden.clone().to(device),
-                                                                  decoder_cell.clone().to(device)
-                                                                  if decoder_cell is not None else None)
+                future_tgt = transposed_tgt_tokens[tgt_idx+1].view(tgt.shape[0], 1)
+                non_zero_idx = (future_tgt != 0).nonzero().t()[0]
 
-                loss += criterion(decoder_x, transposed_tgt_tokens[tgt_idx+1])
-                batch_correct += torch.eq(torch.argmax(decoder_x, dim=1), transposed_tgt_tokens[tgt_idx+1])
+                # Teacher forcing
+                if decoder_cell is None:
+                    decoder_x[non_zero_idx], decoder_hidden[non_zero_idx], _ =\
+                        decoder(tgt[non_zero_idx], transposed_lengths[non_zero_idx],
+                                decoder_hidden[non_zero_idx].to(device),
+                                None)
+                else:
+                        decoder_x[non_zero_idx], decoder_hidden[non_zero_idx], _ =\
+                            decoder(tgt[non_zero_idx], transposed_lengths[non_zero_idx],
+                                    decoder_hidden[non_zero_idx],
+                                    decoder_cell[non_zero_idx])
+
+                loss += criterion(decoder_x[non_zero_idx], transposed_tgt_tokens[tgt_idx+1][non_zero_idx])
+
+                batch_correct[non_zero_idx] += torch.eq(torch.argmax(decoder_x, dim=1),
+                                                        transposed_tgt_tokens[tgt_idx+1])[non_zero_idx]
                 if tgt_idx == transposed_tgt_tokens.shape[0]-2:  # <EOS>
                     break
 
@@ -77,8 +86,9 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
             loss.backward()
 
             # Gradient clipping
-            nn.utils.clip_grad_norm_(encoder.parameters(), 0.25)
-            nn.utils.clip_grad_norm_(decoder.parameters(), 0.25)
+            if args.clipping > 0:
+                nn.utils.clip_grad_norm_(encoder.parameters(), args.clipping)
+                nn.utils.clip_grad_norm_(decoder.parameters(), args.clipping)
 
             optimizer_encoder.step()
             optimizer_decoder.step()
@@ -157,6 +167,7 @@ def main():
     parser.add_argument('--hidden-size', type=int, help='Hidden state size', default=128)
     parser.add_argument('--n-layers', type=int, help='Number of recurrent layers', default=1)
     parser.add_argument('--bidirectional', action='store_true', help='Use bidirectional RNNs')
+    parser.add_argument('--clipping', type=float, help='GRadient clipping', default=0.25)
     args = parser.parse_args()
     init_train_logging()
 
@@ -200,14 +211,14 @@ def main():
         raise NotImplementedError()
 
     if args.criterion == 'xent':
-        criterion = nn.NLLLoss()
+        criterion = nn.CrossEntropyLoss()
     else:
         logging.error("Criterion not implemented")
         raise NotImplementedError()
 
     logging.info('===> Training')
     train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_encoder, optimizer_decoder, criterion,
-          resume_info)
+          resume_info, train_dataset)
 
 
 if __name__ == '__main__':

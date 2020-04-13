@@ -3,7 +3,6 @@ from typing import Tuple
 import argparse
 import os
 import logging
-from typing import Union
 
 
 def load_arch(device: str, args: argparse.Namespace) -> Tuple[torch.nn.Module, torch.nn.Module]:
@@ -49,8 +48,7 @@ def load_arch(device: str, args: argparse.Namespace) -> Tuple[torch.nn.Module, t
     return encoder, decoder
 
 
-def pack_right_padded_seq(seqs: torch.Tensor, lengths: torch.Tensor, device: str) -> Tuple[torch.Tensor, torch.Tensor,
-                                                                                           Union[torch.Tensor, None]]:
+def pack_right_padded_seq(seqs: torch.Tensor, lengths: torch.Tensor, device: str) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Function for packing a right-padded sequence, inspired by the functionality of
     torch.nn.utils.rnn.pack_padded_sequence.
@@ -59,20 +57,16 @@ def pack_right_padded_seq(seqs: torch.Tensor, lengths: torch.Tensor, device: str
     first token of second batch,... last token of last batch] and removes padding. It also returns the effective batch
     size at each iteration, which will be [number of first tokens across batch, number of second tokens...].
     lengths is used to verify that the sequence are ordered by length.
-    If the batch is not sorted by increasing lengths, then the batch is sorted, and the third element of the tuple
-    contains the indices returned by the sorting procedure.
+    If the batch is not sorted by increasing lengths, an exception is thrown.
     :param seqs: [batch, right-padded tokens]
     :param lengths: [batch]
     :param device: device
-    :return: ([packed tokens], [effective batch sizes], either None or [batch])
+    :return: ([packed tokens], [effective batch sizes])
     """
     prev = lengths[0]
-    sort_idx = None
     for l in lengths:
         if l < prev:
-            lengths, sort_idx = lengths.sort()
-            seqs = seqs[sort_idx]
-            break
+            raise Exception('Unsorted batches!')
         else:
             prev = l
     effective_batch_sizes = (seqs != 0).sum(dim=0)
@@ -80,7 +74,7 @@ def pack_right_padded_seq(seqs: torch.Tensor, lengths: torch.Tensor, device: str
     seqs = seqs.permute(-1, 0).reshape(seqs.shape[0] * seqs.shape[1])  # [batch, tokens] -> [batch*tokens]
     non_pad_idx = (seqs != 0).nonzero().flatten()
     seqs = seqs[non_pad_idx]
-    return seqs, effective_batch_sizes, sort_idx
+    return seqs, effective_batch_sizes
 
 
 def init_train_logging():
