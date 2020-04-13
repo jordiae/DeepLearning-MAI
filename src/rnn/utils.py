@@ -17,36 +17,39 @@ def load_arch(device: str, args: argparse.Namespace) -> Tuple[torch.nn.Module, t
     """
     from rnn.models import VanillaRNN, LSTM, GRU, Decoder
     decoder_bidirectional_mul = 2 if args.bidirectional else 1
+    embeddings = None
+    if args.share_embeddings:
+        embeddings = nn.Embedding(args.vocab_size, args.embedding_size)
     if args.arch == 'elman':
         encoder = VanillaRNN(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                              hidden_features=args.hidden_size, n_layers=args.n_layers, mode='elman',
-                             dropout=args.dropout, bidirectional=args.bidirectional)
+                             dropout=args.dropout, bidirectional=args.bidirectional, embeddings=embeddings)
         decoder = Decoder(VanillaRNN(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                                      hidden_features=args.hidden_size*decoder_bidirectional_mul, n_layers=args.n_layers,
-                                     mode='elman', dropout=args.dropout, bidirectional=False),
+                                     mode='elman', dropout=args.dropout, bidirectional=False, embeddings=embeddings),
                           args.vocab_size)
     elif args.arch == 'jordan':
         encoder = VanillaRNN(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                              hidden_features=args.hidden_size, n_layers=args.n_layers, mode='jordan',
-                             dropout=args.dropout, bidirectional=args.bidirectional)
+                             dropout=args.dropout, bidirectional=args.bidirectional, embeddings=embeddings)
         decoder = Decoder(VanillaRNN(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                                      hidden_features=args.hidden_size*decoder_bidirectional_mul, n_layers=args.n_layers,
-                                     mode='jordan', dropout=args.dropout, bidirectional=False),
+                                     mode='jordan', dropout=args.dropout, bidirectional=False, embeddings=embeddings),
                           args.vocab_size)
     elif args.arch == 'lstm':
         encoder = LSTM(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                        hidden_features=args.hidden_size, n_layers=args.n_layers, dropout=args.dropout,
-                       bidirectional=args.bidirectional)
+                       bidirectional=args.bidirectional, embeddings=embeddings)
         decoder = Decoder(LSTM(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                                hidden_features=args.hidden_size*decoder_bidirectional_mul, n_layers=args.n_layers,
-                               dropout=args.dropout, bidirectional=False), args.vocab_size)
+                               dropout=args.dropout, bidirectional=False, embeddings=embeddings), args.vocab_size)
     elif args.arch == 'gru':
         encoder = GRU(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                       hidden_features=args.hidden_size, n_layers=args.n_layers, dropout=args.dropout,
-                      bidirectional=args.bidirectional)
+                      bidirectional=args.bidirectional, embeddings=embeddings)
         decoder = Decoder(GRU(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                               hidden_features=args.hidden_size*decoder_bidirectional_mul, n_layers=args.n_layers,
-                              dropout=args.dropout, bidirectional=False), args.vocab_size)
+                              dropout=args.dropout, bidirectional=False, embeddings=embeddings), args.vocab_size)
     else:
         raise NotImplementedError()
     return encoder, decoder

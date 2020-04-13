@@ -216,6 +216,7 @@ def main():
     parser.add_argument('--n-layers', type=int, help='Number of recurrent layers', default=1)
     parser.add_argument('--bidirectional', action='store_true', help='Use bidirectional RNN in the encoder')
     parser.add_argument('--clipping', type=float, help='Gradient clipping', default=0.25)
+    parser.add_argument('--share-embeddings', action='store_true', help='Share input and output embeddings')
     args = parser.parse_args()
     init_train_logging()
 

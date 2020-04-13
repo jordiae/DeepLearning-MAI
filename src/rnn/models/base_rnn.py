@@ -41,13 +41,15 @@ class BaseRNNLayer(nn.Module):
 
 
 class BaseRNN(nn.Module):
-    def __init__(self, device, vocab_size: int, embedding_dim: int, hidden_features: int, n_layers: int, dropout: float = 0.0,
-                 bidirectional: bool = False, cell: bool = False):
+    def __init__(self, device: torch.device, vocab_size: int, embedding_dim: int, hidden_features: int, n_layers: int,
+                 dropout: float = 0.0, bidirectional: bool = False, cell: bool = False,
+                 embeddings: Union[nn.Embedding, None] = None):
         """
         Base class for RNN networks such that:
         - The input is a discrete sequence of tokens.
         - The target is a binary label.
         The final hidden state is input to a single-layer MLP classifier.
+        :param device: torch device
         :param vocab_size: Vocabulary size for the embedding layer
         :param embedding_dim: Embedding dimension (input to the first recurrent layer)
         :param hidden_features: Number of hidden features in the RNN layers.
@@ -55,14 +57,14 @@ class BaseRNN(nn.Module):
         :param dropout: Dropout probability, for for the classifier and the recurrent layers.
         :param bidirectional: Whether to use bidirectional RNNs (and concat the output of both directions).
         :param cell: Whether the network has an internal cell state.
-        :param device: Device
+        :param embeddings: If not None, initialized embedding layer (for embedding sharing).
         """
         super().__init__()
         self.device = device
         assert vocab_size > 0
         self.vocab_size = vocab_size
         assert embedding_dim > 0
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.embedding = nn.Embedding(vocab_size, embedding_dim) if embeddings is None else embeddings
         self.input_features = embedding_dim
         assert hidden_features > 0
         self.hidden_features = hidden_features
