@@ -121,6 +121,12 @@ class BaseRNN(nn.Module):
         for effective_batch_size in effective_batch_sizes:
             effective_batch = x[done_batches:effective_batch_size + done_batches]
             for idx, layer in enumerate(layers):
+                if isinstance(layer, nn.Dropout):
+                    effective_batch = layer(effective_batch)
+                    continue
+                if self.dropout:
+                    idx //= 2
+
                 hidden_batch = hidden[:effective_batch_size, idx].clone()
                 if not self.cell:
                     effective_batch, _ = layer(effective_batch, hidden_batch)
