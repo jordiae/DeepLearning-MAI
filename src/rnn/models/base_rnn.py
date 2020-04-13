@@ -128,6 +128,7 @@ class BaseRNN(nn.Module):
                     idx //= 2
 
                 hidden_batch = hidden[:effective_batch_size, idx].clone()
+                hidden_batch.retain_grad()
                 if not self.cell:
                     effective_batch, _ = layer(effective_batch, hidden_batch)
                     hidden[:effective_batch_size, idx] = effective_batch

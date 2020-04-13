@@ -13,7 +13,7 @@ import numpy as np
 
 
 def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_encoder, optimizer_decoder, criterion,
-          resume_info, seed=42):
+          resume_info, dataset, seed=42):
     torch.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
@@ -36,6 +36,9 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
         total = 0
         correct = 0
         for idx, data in enumerate(train_loader):
+            #print('Input:', dataset.decode(data[0][0]))
+            #print('Target:', dataset.decode(data[1][0]))
+            #input()
             if (idx+1) % 10 == 0:
                 logging.info(f'{idx+1}/{len(train_loader)} batches')
             src_tokens, tgt_tokens, src_lengths, tgt_lengths = data[0].to(device), data[1].to(device), \
@@ -51,20 +54,43 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
             # Assuming <BOS> and <EOS> already present in tgt_tokens
             # For the loss and accuracy, we take into account <EOS>, but not <BOS>
             batch_correct = torch.zeros(args.batch_size).to(device).long()
+            transposed_lengths = torch.ones(args.batch_size).long().to(device)
+            decoder_x = torch.zeros(args.batch_size, args.vocab_size).to(device)
             for tgt_idx, tgt in enumerate(transposed_tgt_tokens):
                 tgt = tgt.view(tgt.shape[0], 1)
+                #print('Input: token:', dataset.decode(tgt[0]))
+                #print('Target: token:', dataset.decode([transposed_tgt_tokens[tgt_idx+1][0]]))
+
                 # Teacher forcing
                 # TODO: not always ones in lengths, add counter
-                zero_idx = (tgt == 0).nonzero().t()[0]
-                transposed_lengths = torch.ones(args.batch_size).long()
-                transposed_lengths[zero_idx] = torch.zeros(zero_idx.shape).long()
-                decoder_x, decoder_hidden, decoder_cell = decoder(tgt, transposed_lengths.to(device),
-                                                                  decoder_hidden.clone().to(device),
-                                                                  decoder_cell.clone().to(device)
-                                                                  if decoder_cell is not None else None)
+                non_zero_idx = (tgt != 0).nonzero().t()[0]
+                #transposed_lengths = torch.zeros(args.batch_size).long()
+                #transposed_lengths[non_zero_idx] = torch.ones(non_zero_idx.shape).long()
 
-                loss += criterion(decoder_x, transposed_tgt_tokens[tgt_idx+1])
-                batch_correct += torch.eq(torch.argmax(decoder_x, dim=1), transposed_tgt_tokens[tgt_idx+1])
+                if decoder_cell is None:
+                    decoder_x[non_zero_idx], decoder_hidden[non_zero_idx], _ =\
+                        decoder(tgt[non_zero_idx], transposed_lengths[non_zero_idx], #transposed_lengths.to(device),
+                                                                  decoder_hidden[non_zero_idx].to(device),
+                                                                  None)
+                else:
+                        decoder_x[non_zero_idx], decoder_hidden[non_zero_idx], decoder_cell[non_zero_idx] = decoder(tgt[non_zero_idx],
+                                                                                           transposed_lengths[
+                                                                                               non_zero_idx],
+                                                                                           # transposed_lengths.to(device),
+                                                                                           decoder_hidden[
+                                                                                               non_zero_idx].clone().to(
+                                                                                               device), decoder_cell[non_zero_idx].clone().to(device))
+
+                #loss += criterion(decoder_x[non_zero_idx], transposed_tgt_tokens[tgt_idx+1][non_zero_idx])
+                loss += criterion(decoder_x[non_zero_idx], transposed_tgt_tokens[tgt_idx+1][non_zero_idx])
+                #if 0 in non_zero_idx:
+                #    print('Prediction: token:', dataset.decode([torch.argmax(decoder_x, dim=1)[0]]))
+                #else:
+                #    print('No prediction for this question')
+                #input()
+                #print()
+
+                batch_correct[non_zero_idx] += torch.eq(torch.argmax(decoder_x, dim=1), transposed_tgt_tokens[tgt_idx+1])[non_zero_idx]
                 if tgt_idx == transposed_tgt_tokens.shape[0]-2:  # <EOS>
                     break
 
@@ -207,7 +233,7 @@ def main():
 
     logging.info('===> Training')
     train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_encoder, optimizer_decoder, criterion,
-          resume_info)
+          resume_info, train_dataset)
 
 
 if __name__ == '__main__':

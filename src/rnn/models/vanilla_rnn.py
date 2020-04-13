@@ -57,8 +57,14 @@ class VanillaRNN(BaseRNN):
 
 
 if __name__ == '__main__':
-    net = VanillaRNN(100, 64, 128, 3, mode='jordan')
+    from rnn.models.base_rnn import Decoder
+    net = VanillaRNN(torch.device('cpu'), 100, 64, 128, 1, mode='jordan')
     x = torch.tensor([[1, 0], [9, 3], [4, 5]])
     lengths = torch.tensor([1, 2, 2])
-    y = net(x, lengths)
-    print(y)
+    encoder_x, encoder_hidden, _ = net(x, lengths)
+    net2 = VanillaRNN(torch.device('cpu'), 100, 64, 128, 1, mode='jordan')
+    decoder = Decoder(net2, 100)
+    t = torch.tensor([[1], [9], [4]])
+    l = torch.tensor([[1], [1], [1]])
+    decoder_x, decoder_hidden, _ = decoder(t, l, encoder_hidden, None)
+    print(decoder_x)
