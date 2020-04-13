@@ -212,10 +212,10 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.net = net
         self.linear = nn.Linear(net.hidden_features * 2 if net.bidirectional else net.hidden_features, vocab_size)
-        self.softmax = nn.LogSoftmax(dim=0)
+        #self.softmax = nn.LogSoftmax(dim=0)
 
     def forward(self, tgt_tokens, tgt_lengths, initial_hidden, initial_cell):
         x, hidden, cell = self.net(tgt_tokens, tgt_lengths, initial_hidden, initial_cell)
         x = self.linear(x)
-        x = self.softmax(x)
+        #x = self.softmax(x)
         return x, hidden, cell

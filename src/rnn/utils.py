@@ -70,6 +70,7 @@ def pack_right_padded_seq(seqs: torch.Tensor, lengths: torch.Tensor, device: str
     sort_idx = None
     for l in lengths:
         if l < prev:
+            raise Exception('Unsorted batches!')
             lengths, sort_idx = lengths.sort()
             seqs = seqs[sort_idx]
             break
@@ -80,7 +81,7 @@ def pack_right_padded_seq(seqs: torch.Tensor, lengths: torch.Tensor, device: str
     seqs = seqs.permute(-1, 0).reshape(seqs.shape[0] * seqs.shape[1])  # [batch, tokens] -> [batch*tokens]
     non_pad_idx = (seqs != 0).nonzero().flatten()
     seqs = seqs[non_pad_idx]
-    return seqs, effective_batch_sizes, sort_idx
+    return seqs, effective_batch_sizes, None#sort_idx
 
 
 def init_train_logging():

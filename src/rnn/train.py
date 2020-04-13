@@ -45,7 +45,7 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
                                                                data[2].to(device), data[3].to(device)
             optimizer_encoder.zero_grad()
             optimizer_decoder.zero_grad()
-            _, encoder_hidden, encoder_cell = encoder(src_tokens, src_lengths)
+            encoder_x, encoder_hidden, encoder_cell = encoder(src_tokens, src_lengths)
             decoder_hidden = encoder_hidden
             decoder_cell = encoder_cell
 
@@ -226,7 +226,7 @@ def main():
         raise NotImplementedError()
 
     if args.criterion == 'xent':
-        criterion = nn.NLLLoss()
+        criterion = nn.CrossEntropyLoss()#nn.NLLLoss()
     else:
         logging.error("Criterion not implemented")
         raise NotImplementedError()
