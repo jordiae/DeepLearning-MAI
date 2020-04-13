@@ -58,12 +58,13 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
             decoder_x = torch.zeros(args.batch_size, args.vocab_size).to(device)
             for tgt_idx, tgt in enumerate(transposed_tgt_tokens):
                 tgt = tgt.view(tgt.shape[0], 1)
+                future_tgt = transposed_tgt_tokens[tgt_idx+1].view(tgt.shape[0], 1)
                 #print('Input: token:', dataset.decode(tgt[0]))
                 #print('Target: token:', dataset.decode([transposed_tgt_tokens[tgt_idx+1][0]]))
 
                 # Teacher forcing
                 # TODO: not always ones in lengths, add counter
-                non_zero_idx = (tgt != 0).nonzero().t()[0]
+                non_zero_idx = (future_tgt != 0).nonzero().t()[0]
                 #transposed_lengths = torch.zeros(args.batch_size).long()
                 #transposed_lengths[non_zero_idx] = torch.ones(non_zero_idx.shape).long()
 
@@ -103,8 +104,9 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
             loss.backward()
 
             # Gradient clipping
-            nn.utils.clip_grad_norm_(encoder.parameters(), 0.25)
-            nn.utils.clip_grad_norm_(decoder.parameters(), 0.25)
+            if args.clipping > 0:
+                nn.utils.clip_grad_norm_(encoder.parameters(), args.clipping)
+                nn.utils.clip_grad_norm_(decoder.parameters(), args.clipping)
 
             optimizer_encoder.step()
             optimizer_decoder.step()
@@ -183,6 +185,7 @@ def main():
     parser.add_argument('--hidden-size', type=int, help='Hidden state size', default=128)
     parser.add_argument('--n-layers', type=int, help='Number of recurrent layers', default=1)
     parser.add_argument('--bidirectional', action='store_true', help='Use bidirectional RNNs')
+    parser.add_argument('--clipping', type=float, help='GRadient clipping', default=0.25)
     args = parser.parse_args()
     init_train_logging()
 
