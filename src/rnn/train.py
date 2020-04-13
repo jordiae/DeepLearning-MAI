@@ -15,6 +15,9 @@ from rnn.utils import LabelSmoothingLoss
 
 def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_encoder, optimizer_decoder, criterion,
           resume_info, dataset, seed=42):
+    # for idx, data in enumerate(valid_loader):
+    #     print(f'batch {idx+1}:', data[0].shape, data[1].shape, data[2].shape, data[3].shape)
+    # exit()
     torch.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
@@ -51,9 +54,9 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
             transposed_tgt_tokens = tgt_tokens.t()
             # Assuming <BOS> and <EOS> already present in tgt_tokens
             # For the loss and accuracy, we take into account <EOS>, but not <BOS>
-            batch_correct = torch.zeros(args.batch_size).to(device).long()
-            transposed_lengths = torch.ones(args.batch_size).long().to(device)
-            decoder_x = torch.zeros(args.batch_size, args.vocab_size).to(device)
+            batch_correct = torch.zeros(src_tokens.shape[0]).to(device).long()
+            transposed_lengths = torch.ones(src_tokens.shape[0]).long().to(device)
+            decoder_x = torch.zeros(src_tokens.shape[0], args.vocab_size).to(device)
             for tgt_idx, tgt in enumerate(transposed_tgt_tokens):
                 tgt = tgt.view(tgt.shape[0], 1)
                 future_tgt = transposed_tgt_tokens[tgt_idx+1].view(tgt.shape[0], 1)
@@ -120,9 +123,9 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
                 transposed_tgt_tokens = tgt_tokens.t()
                 # Assuming <BOS> and <EOS> already present in tgt_tokens
                 # For the loss and accuracy, we take into account <EOS>, but not <BOS>
-                batch_correct = torch.zeros(args.batch_size).to(device).long()
-                transposed_lengths = torch.ones(args.batch_size).long().to(device)
-                decoder_x = torch.zeros(args.batch_size, args.vocab_size).to(device)
+                batch_correct = torch.zeros(src_tokens.shape[0]).to(device).long()
+                transposed_lengths = torch.ones(src_tokens.shape[0]).long().to(device)
+                decoder_x = torch.zeros(src_tokens.shape[0], args.vocab_size).to(device)
                 first = True
                 # In inference, we don't apply Teacher forcing
                 # Greedy inference (TODO: If we have time, beam search)
