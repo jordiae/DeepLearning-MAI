@@ -51,7 +51,10 @@ class MathDataset(Dataset):
         self.bos_token = '<BOS>'
         self.eos_token = '<EOS>'
         self.problem_types = problem_types if problem_types is not None else os.listdir(path)
-        self.n_lines_problem = int(total_lines / len(self.problem_types))
+
+        self.read_lines = [(i+1) * (int((total_lines * (self.proportions[self.subset]) // 100) / len(self.problem_types)))
+                           for i in range(len(self.problem_types))]
+        self.read_lines[-1] += ((total_lines* (self.proportions[self.subset]) // 100) % len(self.problem_types))
 
         def check_idx(i: int, sub: str) -> bool:
             """
@@ -75,9 +78,8 @@ class MathDataset(Dataset):
         for prob_id, problem_type in tqdm(enumerate(self.problem_types), total=len(self.problem_types)):
             with open(os.path.join(path, problem_type), 'r') as f:
                 idx_x = 0
-                read_lines = (self.n_lines_problem * (self.proportions[self.subset])//100)
                 for idx, line in enumerate(f.readlines()):
-                    if len(line.split()) == 0 or len(self.Y) >= (prob_id+1)*read_lines:
+                    if len(line.split()) == 0 or len(self.Y) >= self.read_lines[prob_id]:
                         break
                     if idx % 2 == 0:
                         if not check_idx(idx_x, self.subset):
