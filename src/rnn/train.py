@@ -10,6 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from rnn.evaluate import prettify_eval, evaluate
 from src.rnn.utils import load_arch, init_train_logging
 import numpy as np
+from rnn.utils import LabelSmoothingLoss
 
 
 def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_encoder, optimizer_decoder, criterion,
@@ -99,7 +100,6 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
         writer.add_scalar('Avg-loss/train', loss_train/total, epoch+1)
         writer.add_scalar('Accuracy/train', accuracy, epoch + 1)
 
-        continue
         # valid step: TODO
         correct = 0
         total = 0
@@ -107,26 +107,68 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
         encoder.eval()
         decoder.eval()
         with torch.no_grad():
-            for data in valid_loader:
+            for idx, data in enumerate(valid_loader):
+                if (idx + 1) % 10 == 0:
+                    logging.info(f'{idx+1}/{len(valid_loader)} batches')
                 src_tokens, tgt_tokens, src_lengths, tgt_lengths = data[0].to(device), data[1].to(device), \
                                                                    data[2].to(device), data[3].to(device)
-                outputs = model(src_tokens, src_lengths)
-                tgt_tokens = tgt_tokens.unsqueeze(1).float()
-                loss = criterion(outputs, tgt_tokens)
-                loss_val += loss
+
+                transposed_tgt_tokens = tgt_tokens.t()
+                # Assuming <BOS> and <EOS> already present in tgt_tokens
+                # For the loss and accuracy, we take into account <EOS>, but not <BOS>
+                batch_correct = torch.zeros(args.batch_size).to(device).long()
+                transposed_lengths = torch.ones(args.batch_size).long().to(device)
+                decoder_x = torch.zeros(args.batch_size, args.vocab_size).to(device)
+                first = True
+                # In inference, we don't apply Teacher forcing
+                # Greedy inference (TODO: If we have time, beam search)
+                # For efficiency, we don't wait until the output sentence is complete (<EOS>).
+                for tgt_idx, tgt in enumerate(transposed_tgt_tokens):
+                    tgt = tgt.view(tgt.shape[0], 1)
+                    if first:
+                        last_predictions = tgt
+                        first = False
+                    future_tgt = transposed_tgt_tokens[tgt_idx + 1].view(tgt.shape[0], 1)
+                    non_zero_idx = (future_tgt != 0).nonzero().t()[0]
+
+                    if decoder_cell is None:
+                        decoder_x[non_zero_idx], decoder_hidden[non_zero_idx], _ = \
+                            decoder(last_predictions[non_zero_idx], transposed_lengths[non_zero_idx],
+                                    decoder_hidden[non_zero_idx].to(device),
+                                    None)
+                    else:
+                        decoder_x[non_zero_idx], decoder_hidden[non_zero_idx], _ = \
+                            decoder(last_predictions[non_zero_idx], transposed_lengths[non_zero_idx],
+                                    decoder_hidden[non_zero_idx],
+                                    decoder_cell[non_zero_idx])
+
+                    last_predictions[non_zero_idx] =\
+                        torch.argmax(decoder_x, dim=1)[non_zero_idx].view(non_zero_idx.shape[0], 1)
+                    loss_val += criterion(decoder_x[non_zero_idx], transposed_tgt_tokens[tgt_idx + 1][non_zero_idx])
+
+                    batch_correct[non_zero_idx] += torch.eq(torch.argmax(decoder_x, dim=1),
+                                                            transposed_tgt_tokens[tgt_idx + 1])[non_zero_idx]
+                    if tgt_idx == transposed_tgt_tokens.shape[0] - 2:  # <EOS>
+                        break
+
+                # Binary evaluation: either correct (exactly equal, character by character) or incorrect
+                for tgt_idx, c in enumerate(batch_correct):
+                    if c == tgt_lengths[tgt_idx] - 1:  # Don't consider <BOS>
+                        correct += 1
                 total += tgt_tokens.size(0)
-                predicted = torch.round(outputs.data)
-                correct += (predicted == tgt_tokens).sum().item()
+
         accuracy = 100 * correct/total
         logging.info(f'valid: avg_loss = {loss_val/total:.5f} | accuracy = {accuracy:.2f}')
         writer.add_scalar('Avg-loss/valid', loss_val / total, epoch + 1)
         writer.add_scalar('Accuracy/valid', accuracy, epoch + 1)
 
-        torch.save(model.state_dict(), 'checkpoint_last.pt')
+        torch.save(encoder.state_dict(), 'encoder_checkpoint_last.pt')
+        torch.save(decoder.state_dict(), 'decoder_checkpoint_last.pt')
         if accuracy > best_valid_metric:
             epochs_without_improvement = 0
             best_valid_metric = accuracy
-            torch.save(model.state_dict(), 'checkpoint_best.pt')
+            torch.save(encoder.state_dict(), 'encoder_checkpoint_best.pt')
+            torch.save(decoder.state_dict(), 'decoder_checkpoint_best.pt')
             logging.info(f'best valid accuracy: {accuracy:.2f}')
         else:
             epochs_without_improvement += 1
@@ -137,10 +179,13 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
         with open('resume_info.json', 'w') as f:
             json.dump(resume_info, f, indent=2)
 
-    model = load_arch(args)
-    model.load_state_dict(torch.load('checkpoint_best.pt'))
-    model.to(device)
-    eval_res = evaluate(valid_loader, model, device)
+    encoder, decoder = load_arch(device, args)
+    encoder.load_state_dict(torch.load('encoder_checkpoint_best.pt'))
+    decoder.load_state_dict(torch.load('decoder_checkpoint_best.pt'))
+    encoder.to(device)
+    decoder.to(device)
+    # TODO: Evaluate
+    # eval_res = evaluate(valid_loader, encoder, decoder, device)
     logging.info(prettify_eval('train', *eval_res))
 
 
@@ -212,6 +257,8 @@ def main():
 
     if args.criterion == 'xent':
         criterion = nn.CrossEntropyLoss()
+    elif args.criterion == 'label-smoothed-xent':
+        criterion = LabelSmoothingLoss(smoothing=args.smooth_criterion)
     else:
         logging.error("Criterion not implemented")
         raise NotImplementedError()
