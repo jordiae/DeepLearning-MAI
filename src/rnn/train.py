@@ -166,8 +166,8 @@ def main():
     parser.add_argument('--embedding-size', type=int, help='Embedding size', default=64)
     parser.add_argument('--hidden-size', type=int, help='Hidden state size', default=128)
     parser.add_argument('--n-layers', type=int, help='Number of recurrent layers', default=1)
-    parser.add_argument('--bidirectional', action='store_true', help='Use bidirectional RNNs')
-    parser.add_argument('--clipping', type=float, help='GRadient clipping', default=0.25)
+    parser.add_argument('--bidirectional', action='store_true', help='Use bidirectional RNN in the encoder')
+    parser.add_argument('--clipping', type=float, help='Gradient clipping', default=0.25)
     args = parser.parse_args()
     init_train_logging()
 

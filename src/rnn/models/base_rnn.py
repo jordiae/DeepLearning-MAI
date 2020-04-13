@@ -147,11 +147,13 @@ class BaseRNN(nn.Module):
             reverse_effective_batch_sizes = effective_batch_sizes.clone()
             reverse_effective_batch_sizes = torch.flip(reverse_effective_batch_sizes, dims=(-1, ))
             if initial_hidden is not None:
-                initial_hidden, reverse_initial_hidden = torch.unbind(initial_hidden)
+                initial_hidden, reverse_initial_hidden = initial_hidden[:, :, :self.hidden_features],\
+                                                         initial_hidden[:, :, self.hidden_features:]
             else:
                 reverse_initial_hidden = None
             if initial_cell is not None:
-                initial_cell, reverse_initial_cell = torch.unbind(initial_cell)
+                initial_cell, reverse_initial_cell = initial_cell[:, :, :self.hidden_features], \
+                                                       initial_cell[:, :, self.hidden_features:]
             else:
                 reverse_initial_cell = None
 
@@ -162,9 +164,9 @@ class BaseRNN(nn.Module):
             reverse_hidden, reverse_cell = self._forward(reverse_x, self.layers, bs, reverse_effective_batch_sizes,
                                                          reverse_initial_hidden, reverse_initial_cell)
             reverse_x = reverse_hidden[:, -1]
-            hidden = torch.stack((hidden, reverse_hidden))
+            hidden = torch.cat((hidden, reverse_hidden), dim=-1)
             if self.cell:
-                cell = torch.stack((cell, reverse_cell))
+                cell = torch.cat((cell, reverse_cell), dim=-1)
             x = torch.cat((x, reverse_x), dim=-1)
 
         return x, hidden, None if not self.cell else cell
@@ -178,8 +180,9 @@ class Decoder(nn.Module):
         :param vocab_size:  Vocabulary size
         """
         super(Decoder, self).__init__()
+        assert not net.bidirectional
         self.net = net
-        self.linear = nn.Linear(net.hidden_features * 2 if net.bidirectional else net.hidden_features, vocab_size)
+        self.linear = nn.Linear(net.hidden_features, vocab_size)
 
     def forward(self, tgt_tokens, tgt_lengths, initial_hidden, initial_cell):
         x, hidden, cell = self.net(tgt_tokens, tgt_lengths, initial_hidden, initial_cell)
