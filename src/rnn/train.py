@@ -15,9 +15,6 @@ from rnn.utils import LabelSmoothingLoss
 
 def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_encoder, optimizer_decoder, criterion,
           resume_info, dataset, seed=42):
-    # for idx, data in enumerate(valid_loader):
-    #     print(f'batch {idx+1}:', data[0].shape, data[1].shape, data[2].shape, data[3].shape)
-    # exit()
     torch.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
@@ -103,7 +100,7 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
         writer.add_scalar('Avg-loss/train', loss_train/total, epoch+1)
         writer.add_scalar('Accuracy/train', accuracy, epoch + 1)
 
-        # valid step: TODO
+        # valid step
         correct = 0
         total = 0
         loss_val = 0
@@ -191,9 +188,8 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
     decoder.load_state_dict(torch.load('decoder_checkpoint_best.pt'))
     encoder.to(device)
     decoder.to(device)
-    # TODO: Evaluate
-    # eval_res = evaluate(valid_loader, encoder, decoder, device)
-    #logging.info(prettify_eval('train', *eval_res))
+    eval_res = evaluate(valid_loader, encoder, decoder, args.vocab_size, device)
+    logging.info(prettify_eval('train', *eval_res))
 
 
 def main():

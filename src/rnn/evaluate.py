@@ -7,6 +7,8 @@ import logging
 from rnn.utils import load_arch
 from rnn.dataset import MathDataset, SortedShufflingDataLoader
 from typing import List
+from torch import nn
+from typing import Tuple
 
 
 class ArgsStruct:
@@ -20,30 +22,76 @@ class ArgsStruct:
 
 def prettify_eval(set_: str, accuracy: float, correct: int, avg_loss: float, n_instances: int):
     """Returns string with prettified classification results"""
-    return '\n' + set_ + ' set average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+    return '\n' + set_ + ' set average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
         avg_loss, correct, n_instances, accuracy)
 
 
-def evaluate(data_loader: SortedShufflingDataLoader, model: torch.nn.Module, device: torch.device):
+def evaluate(data_loader: SortedShufflingDataLoader, encoder: torch.nn.Module, decoder: torch.nn.Module,
+             vocab_size: int, device: torch.device) -> Tuple[float, int, float, int]:
     """Evaluated a model with the given data loader"""
-    model.eval()
-    avg_loss = 0
     correct = 0
-    y_output = []
-    y_ground_truth = []
+    total = 0
+    total_loss = 0
+    encoder.eval()
+    decoder.eval()
+    criterion = nn.CrossEntropyLoss()
     with torch.no_grad():
-        for data, target, lengths in data_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data, lengths)
-            avg_loss += F.binary_cross_entropy(output, target, reduction='sum').item()  # sum batch loss
-            pred = output.argmax(dim=1, keepdim=True)  # index of the max log-probability
-            correct += pred.eq(target.view_as(pred)).sum().item()
-            y_output += torch.squeeze(pred).tolist()
-            y_ground_truth += torch.squeeze(target).tolist()
+        for idx, data in enumerate(data_loader):
+            if (idx + 1) % 10 == 0:
+                logging.info(f'{idx+1}/{len(data_loader)} batches')
+            src_tokens, tgt_tokens, src_lengths, tgt_lengths = data[0].to(device), data[1].to(device), \
+                                                               data[2].to(device), data[3].to(device)
 
-        avg_loss /= len(data_loader.dataset)
-    accuracy = 100. * correct / len(data_loader.dataset)
-    return accuracy, correct, avg_loss, len(data_loader.dataset)
+            encoder_x, encoder_hidden, encoder_cell = encoder(src_tokens, src_lengths)
+            decoder_hidden = encoder_hidden
+            decoder_cell = encoder_cell
+
+            transposed_tgt_tokens = tgt_tokens.t()
+            # Assuming <BOS> and <EOS> already present in tgt_tokens
+            # For the loss and accuracy, we take into account <EOS>, but not <BOS>
+            batch_correct = torch.zeros(src_tokens.shape[0]).to(device).long()
+            transposed_lengths = torch.ones(src_tokens.shape[0]).long().to(device)
+            decoder_x = torch.zeros(src_tokens.shape[0], vocab_size).to(device)
+            first = True
+            # In inference, we don't apply Teacher forcing
+            # Greedy inference (TODO: If we have time, beam search)
+            # For efficiency, we don't wait until the output sentence is complete (<EOS>).
+            for tgt_idx, tgt in enumerate(transposed_tgt_tokens):
+                tgt = tgt.view(tgt.shape[0], 1)
+                if first:
+                    last_predictions = tgt
+                    first = False
+                future_tgt = transposed_tgt_tokens[tgt_idx + 1].view(tgt.shape[0], 1)
+                non_zero_idx = (future_tgt != 0).nonzero().t()[0]
+
+                if decoder_cell is None:
+                    decoder_x[non_zero_idx], decoder_hidden[non_zero_idx], _ = \
+                        decoder(last_predictions[non_zero_idx], transposed_lengths[non_zero_idx],
+                                decoder_hidden[non_zero_idx].to(device),
+                                None)
+                else:
+                    decoder_x[non_zero_idx], decoder_hidden[non_zero_idx], _ = \
+                        decoder(last_predictions[non_zero_idx], transposed_lengths[non_zero_idx],
+                                decoder_hidden[non_zero_idx],
+                                decoder_cell[non_zero_idx])
+
+                last_predictions[non_zero_idx] = \
+                    torch.argmax(decoder_x, dim=1)[non_zero_idx].view(non_zero_idx.shape[0], 1)
+                total_loss += criterion(decoder_x[non_zero_idx], transposed_tgt_tokens[tgt_idx + 1][non_zero_idx])
+
+                batch_correct[non_zero_idx] += torch.eq(torch.argmax(decoder_x, dim=1),
+                                                        transposed_tgt_tokens[tgt_idx + 1])[non_zero_idx]
+                if tgt_idx == transposed_tgt_tokens.shape[0] - 2:  # <EOS>
+                    break
+
+            # Binary evaluation: either correct (exactly equal, character by character) or incorrect
+            for tgt_idx, c in enumerate(batch_correct):
+                if c == tgt_lengths[tgt_idx] - 1:  # Don't consider <BOS>
+                    correct += 1
+            total += tgt_tokens.size(0)
+
+    accuracy = 100 * correct / total
+    return accuracy, correct, total_loss/total, len(data_loader.dataset)
 
 
 def evaluate_ensemble(data_loader: SortedShufflingDataLoader, models: List[torch.nn.Module], device: torch.device):
