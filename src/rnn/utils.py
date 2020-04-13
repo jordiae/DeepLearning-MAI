@@ -1,8 +1,10 @@
 import torch
 from typing import Tuple
+import torch.nn.functional as F
 import argparse
 import os
 import logging
+from torch import nn
 
 
 def load_arch(device: str, args: argparse.Namespace) -> Tuple[torch.nn.Module, torch.nn.Module]:
@@ -87,3 +89,27 @@ def init_train_logging():
     else:
         logging.basicConfig(filename=log_path, level=logging.INFO)
     logging.getLogger('').addHandler(logging.StreamHandler())
+
+
+class LabelSmoothingLoss(nn.Module):
+    def __init__(self, smoothing=0.0):
+        super(LabelSmoothingLoss, self).__init__()
+        self.smoothing = smoothing
+
+    def smooth_one_hot(self, target, classes, smoothing=0.0):
+        assert 0 <= smoothing < 1
+        shape = (target.size(0), classes)
+        with torch.no_grad():
+            target = torch.empty(size=shape, device=target.device) \
+                .fill_(smoothing / (classes - 1)) \
+                .scatter_(1, target.data.unsqueeze(1), 1. - smoothing)
+
+        return target
+
+    def forward(self, input, target):
+        target = LabelSmoothingLoss.smooth_one_hot(self, target, input.size(-1), self.smoothing)
+        lsm = F.log_softmax(input, -1)
+        loss = -(target * lsm).sum(-1)
+        loss = loss.mean()
+
+        return loss
