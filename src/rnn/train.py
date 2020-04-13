@@ -39,8 +39,8 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
         for idx, data in enumerate(train_loader):
             if (idx+1) % 10 == 0:
                 logging.info(f'{idx+1}/{len(train_loader)} batches')
-            src_tokens, tgt_tokens, src_lengths, tgt_lengths = data[0].to(device), data[1].to(device), \
-                                                               data[2].to(device), data[3].to(device)
+            src_tokens, tgt_tokens, src_lengths, tgt_lengths = data[0].to(device), data[1].to(device),\
+                                                               data[2].to(device), data[3].to(device),
             optimizer_encoder.zero_grad()
             optimizer_decoder.zero_grad()
             encoder_x, encoder_hidden, encoder_cell = encoder(src_tokens, src_lengths)

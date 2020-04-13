@@ -9,6 +9,7 @@ from rnn.dataset import MathDataset, SortedShufflingDataLoader
 from typing import List
 from torch import nn
 from typing import Tuple
+from typing import Dict
 
 
 class ArgsStruct:
@@ -20,18 +21,27 @@ class ArgsStruct:
         self.__dict__.update(entries)
 
 
-def prettify_eval(set_: str, accuracy: float, correct: int, avg_loss: float, n_instances: int):
+def prettify_eval(set_: str, accuracy: float, correct: int, avg_loss: float, n_instances: int,
+                  stats: Dict[str, List[int]]):
     """Returns string with prettified classification results"""
+    table = 'problem_type accuracy\n'
+    for k in sorted(stats.keys()):
+        accuracy = stats[k][0]/stats[k][1]
+        table += k
+        table += ' '
+        table += '{:.2f}\n'.format(accuracy)
+
     return '\n' + set_ + ' set average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
-        avg_loss, correct, n_instances, accuracy)
+        avg_loss, correct, n_instances, accuracy) + table + '\n'
 
 
 def evaluate(data_loader: SortedShufflingDataLoader, encoder: torch.nn.Module, decoder: torch.nn.Module,
-             vocab_size: int, device: torch.device) -> Tuple[float, int, float, int]:
+             vocab_size: int, device: torch.device) -> Tuple[float, int, float, int, Dict[str, List[int]]]:
     """Evaluated a model with the given data loader"""
     correct = 0
     total = 0
     total_loss = 0
+    stats = {}
     encoder.eval()
     decoder.eval()
     criterion = nn.CrossEntropyLoss()
@@ -39,8 +49,9 @@ def evaluate(data_loader: SortedShufflingDataLoader, encoder: torch.nn.Module, d
         for idx, data in enumerate(data_loader):
             if (idx + 1) % 10 == 0:
                 logging.info(f'{idx+1}/{len(data_loader)} batches')
-            src_tokens, tgt_tokens, src_lengths, tgt_lengths = data[0].to(device), data[1].to(device), \
-                                                               data[2].to(device), data[3].to(device)
+            src_tokens, tgt_tokens, src_lengths, tgt_lengths, problem_types = data[0].to(device), data[1].to(device), \
+                                                                              data[2].to(device), data[3].to(device),\
+                                                                              data[4]
 
             encoder_x, encoder_hidden, encoder_cell = encoder(src_tokens, src_lengths)
             decoder_hidden = encoder_hidden
@@ -86,12 +97,15 @@ def evaluate(data_loader: SortedShufflingDataLoader, encoder: torch.nn.Module, d
 
             # Binary evaluation: either correct (exactly equal, character by character) or incorrect
             for tgt_idx, c in enumerate(batch_correct):
+                if problem_types[tgt_idx] not in stats:
+                    stats[problem_types[tgt_idx]] = [0, 1]
                 if c == tgt_lengths[tgt_idx] - 1:  # Don't consider <BOS>
                     correct += 1
+                    stats[problem_types[tgt_idx]][0] += 1
             total += tgt_tokens.size(0)
 
     accuracy = 100 * correct / total
-    return accuracy, correct, total_loss/total, len(data_loader.dataset)
+    return accuracy, correct, total_loss/total, len(data_loader.dataset), stats
 
 
 def evaluate_ensemble(data_loader: SortedShufflingDataLoader, models: List[torch.nn.Module], device: torch.device):

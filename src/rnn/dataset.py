@@ -50,6 +50,7 @@ class MathDataset(Dataset):
         self.sorted = False
         self.bos_token = '<BOS>'
         self.eos_token = '<EOS>'
+        self.stored_problem_types = []
         self.problem_types = problem_types if problem_types is not None else os.listdir(path)
 
         self.read_lines = [(i+1) * (int((total_lines * (self.proportions[self.subset]) // 100) / len(self.problem_types)))
@@ -120,14 +121,16 @@ class MathDataset(Dataset):
                         y.append(self.token2idx[self.eos_token])
                         self.Y.append(y)
                         self.tgt_lengths.append(len(y))
+                        self.stored_problem_types.append(problem_type[:-4])
                         idx_x += 1
         assert len(self.X) == len(self.Y)
         self.data_len = len(self.X)
         if self.sort:
             self._sort_by_lengths()
 
-    def __getitem__(self, index: int) -> Tuple[List[int], List[int], int, int]:
-        return self.X[index], self.Y[index], self.src_lengths[index], self.tgt_lengths[index]
+    def __getitem__(self, index: int) -> Tuple[List[int], List[int], int, int, str]:
+        return self.X[index], self.Y[index], self.src_lengths[index], self.tgt_lengths[index],\
+               self.stored_problem_types[index]
 
     def __len__(self) -> int:
         return self.data_len
@@ -180,14 +183,16 @@ class MathDataset(Dataset):
         return ''.join(list(map(lambda x: self.idx2token[x], to_decode)))
 
 
-def pad_collate(data: Tuple[List[List[int]], List[List[int]], List[int], List[int]]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+def pad_collate(data: Tuple[List[List[int]], List[List[int]], List[int], List[int], List[str]]) -> \
+        Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, List[str]]:
     """
 
-    :param data: a tuple (source sequences, target sequences, lengths of source sequences, lengths of target sequences)
-    :return: a right-padded, tensorized version of the aforementioned tuple
+    :param data: a tuple (source sequences, target sequences, lengths of source sequences, lengths of target sequences,
+    problem_types)
+    :return: a right-padded, tensorized version of the aforementioned tuple, + the problem_types strings
     """
     # See: https://discuss.pytorch.org/t/how-to-create-batches-of-a-list-of-varying-dimension-tensors/50773/14
-    src_tokens, tgt_tokens, src_lengths, tgt_lengths = zip(*data)
+    src_tokens, tgt_tokens, src_lengths, tgt_lengths, stored_problem_types = zip(*data)
     longest_src_len = max(src_lengths)
     padded_inputs = torch.zeros((len(data), longest_src_len)).long()
     longest_tgt_len = max(tgt_lengths)
@@ -199,7 +204,7 @@ def pad_collate(data: Tuple[List[List[int]], List[List[int]], List[int], List[in
         padded_inputs[i] = torch.cat([torch.tensor(src_tokens[i]).long(), torch.zeros((longest_src_len - len_seq)).long()])
         len_tgt = len(data[i][1])
         padded_tgt_tokens[i] = torch.cat([torch.tensor(tgt_tokens[i]).long(), torch.zeros((longest_tgt_len - len_tgt)).long()])
-    return padded_inputs.long(), padded_tgt_tokens.long(), src_lengths.long(), tgt_lengths.long()
+    return padded_inputs.long(), padded_tgt_tokens.long(), src_lengths.long(), tgt_lengths.long(), stored_problem_types
 
 
 class SortedRandomSampler(RandomSampler):
@@ -307,6 +312,6 @@ if __name__ == '__main__':
 
     dataloader = SortedShufflingDataLoader(train_dataset, mode='strict_shuffle', batch_size=10)
     for batch in dataloader:
-        src_tokens, tgt_tokens, src_lengths, tgt_lengths = batch
-        print(src_tokens.shape, tgt_tokens.shape, src_lengths.shape, tgt_lengths.shape)
+        src_tokens, tgt_tokens, src_lengths, tgt_lengths, problem_types = batch
+        print(src_tokens.shape, tgt_tokens.shape, src_lengths.shape, tgt_lengths.shape, len(problem_types))
         break
