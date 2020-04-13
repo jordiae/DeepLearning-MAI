@@ -9,10 +9,16 @@ import json
 from torch.utils.tensorboard import SummaryWriter
 from rnn.evaluate import prettify_eval, evaluate
 from src.rnn.utils import load_arch, init_train_logging
+import numpy as np
 
 
 def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_encoder, optimizer_decoder, criterion,
-          resume_info):
+          resume_info, seed=42):
+    torch.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(seed)
+
     writer = SummaryWriter()
     with open('args.json', 'w') as f:
         json.dump(args.__dict__, f, indent=2)
