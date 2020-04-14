@@ -102,6 +102,7 @@ def evaluate(data_loader: SortedShufflingDataLoader, encoder: torch.nn.Module, d
                 if c == tgt_lengths[tgt_idx] - 1:  # Don't consider <BOS>
                     correct += 1
                     stats[problem_types[tgt_idx]][0] += 1
+                stats[problem_types[tgt_idx]][1] += 1
             total += tgt_tokens.size(0)
 
     accuracy = 100 * correct / total
