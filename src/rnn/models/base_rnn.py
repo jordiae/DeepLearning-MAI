@@ -246,6 +246,8 @@ class PyTorchBaseRNN(nn.Module):
         where the first element contains the final hidden states of the last layer, and the second and third one contain
         the final hidden and cell states from all layers, respectively.
         """
+        bs = tokens.shape[0]
+        hidden_layers = initial_hidden.shape[1] if initial_hidden is not None else 0
         tokens = self.embedding(tokens)
         tokens = torch.nn.utils.rnn.pack_padded_sequence(tokens, lengths, batch_first=True, enforce_sorted=False)
         if not self.cell:
@@ -253,14 +255,29 @@ class PyTorchBaseRNN(nn.Module):
             if initial_hidden is None:
                 x, hidden = self.rnn(tokens)
             else:
+                if self.bidirectional:
+                    initial_hidden = initial_hidden.view(bs, self.n_layers, self.hidden_features*2)
+                elif hidden_layers == 2*self.n_layers:
+                    initial_hidden = initial_hidden.view(bs, self.n_layers, self.hidden_features)
                 x, hidden = self.rnn(tokens, initial_hidden.permute(1, 0, 2))
         else:
             if initial_hidden is None:
                 x, (hidden, cell) = self.rnn(tokens)
             else:
+                if self.bidirectional:
+                    initial_hidden = initial_hidden.view(bs, self.n_layers, self.hidden_features*2)
+                    initial_cell = initial_cell.view(bs, self.n_layers, self.hidden_features * 2)
+                elif hidden_layers == 2*self.n_layers:
+                    initial_hidden = initial_hidden.view(bs, self.n_layers, self.hidden_features)
+                    initial_cell = initial_cell.view(bs, self.n_layers, self.hidden_features)
                 x, (hidden, cell) = self.rnn(tokens, (initial_hidden.permute(1, 0, 2), initial_cell.permute(1, 0, 2)))
             cell = cell.permute(1, 0, 2)
+            if hidden_layers == 2 * self.n_layers:
+                cell = torch.cat((cell[:, :, :self.hidden_features // 2], cell[:, :, self.hidden_features // 2:]),
+                                 dim=1)
         hidden = hidden.permute(1, 0, 2)
+        if hidden_layers == 2*self.n_layers:
+            hidden = torch.cat((hidden[:, :, :self.hidden_features//2], hidden[:, :, self.hidden_features//2:]), dim=1)
         x = torch.nn.utils.rnn.pad_packed_sequence(x, batch_first=True)
         x = x[0][:, -1]
         return x, hidden, cell
