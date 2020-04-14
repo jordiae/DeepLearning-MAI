@@ -1,7 +1,7 @@
 from torch.utils.data.dataset import Dataset
 import os
 from typing import Tuple, List, Dict, Union
-from tqdm import tqdm
+# from tqdm import tqdm
 import numpy as np
 from torch.utils.data import DataLoader, RandomSampler
 import torch
@@ -76,7 +76,8 @@ class MathDataset(Dataset):
 
         self.src_lengths = []
         self.tgt_lengths = []
-        for prob_id, problem_type in tqdm(enumerate(self.problem_types), total=len(self.problem_types)):
+        for prob_id, problem_type in enumerate(self.problem_types):
+            # tqdm(enumerate(self.problem_types), total=len(self.problem_types)):
             with open(os.path.join(path, problem_type), 'r') as f:
                 idx_x = 0
                 for idx, line in enumerate(f.readlines()):
