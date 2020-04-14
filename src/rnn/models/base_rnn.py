@@ -183,10 +183,13 @@ class Decoder(nn.Module):
         """
         super(Decoder, self).__init__()
         assert not net.bidirectional
-        self.net = net
+        #self.net = net
+        self.embedding = nn.Embedding(vocab_size, net.input_features)
+        self.lstm = nn.LSTM(net.input_features, net.hidden_features, batch_first=True)
         self.linear = nn.Linear(net.hidden_features, vocab_size)
 
     def forward(self, tgt_tokens, tgt_lengths, initial_hidden, initial_cell):
-        x, hidden, cell = self.net(tgt_tokens, tgt_lengths, initial_hidden, initial_cell)
+        x, (hidden, cell) = self.lstm(self.embedding(tgt_tokens), (initial_hidden.permute(1, 0, 2),
+                                                                   initial_cell.permute(1, 0, 2)))
         x = self.linear(x)
-        return x, hidden, cell
+        return x.squeeze(), hidden.permute(1, 0, 2), cell.permute(1, 0, 2)
