@@ -105,7 +105,7 @@ def evaluate(data_loader: SortedShufflingDataLoader, encoder: torch.nn.Module, d
             total += tgt_tokens.size(0)
 
     accuracy = 100 * correct / total
-    return accuracy, correct, total_loss/total, len(data_loader.dataset), stats
+    return accuracy, correct, total_loss/total, total, stats
 
 
 def evaluate_ensemble(data_loader: SortedShufflingDataLoader, models: List[torch.nn.Module], device: torch.device):
