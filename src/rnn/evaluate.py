@@ -26,10 +26,10 @@ def prettify_eval(set_: str, accuracy: float, correct: int, avg_loss: float, n_i
     """Returns string with prettified classification results"""
     table = 'problem_type accuracy\n'
     for k in sorted(stats.keys()):
-        accuracy = stats[k][0]/stats[k][1]
+        accuracy_ = stats[k][0]/stats[k][1]
         table += k
         table += ' '
-        table += '{:.2f}\n'.format(accuracy)
+        table += '{:.2f}\n'.format(accuracy_)
 
     return '\n' + set_ + ' set average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
         avg_loss, correct, n_instances, accuracy) + table + '\n'
