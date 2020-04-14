@@ -217,6 +217,11 @@ def main():
     parser.add_argument('--bidirectional', action='store_true', help='Use bidirectional RNN in the encoder')
     parser.add_argument('--clipping', type=float, help='Gradient clipping', default=0.25)
     parser.add_argument('--share-embeddings', action='store_true', help='Share input and output embeddings')
+    parser.add_argument('--no-pytorch-rnn', action='store_true', help='Use our hand-written RNN implementations'
+                                                                      '(considerably less efficient) instead of the'
+                                                                      'PyTorch ones PyTorch RNN implementations'
+                                                                      'instead of our hand-written ones, for'
+                                                                      'efficiency.')
     args = parser.parse_args()
     init_train_logging()
 
