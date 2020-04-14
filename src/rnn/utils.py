@@ -7,6 +7,23 @@ import logging
 from torch import nn
 
 
+class Encoder(nn.Module):
+    def __init__(self, net):
+        super(Encoder, self).__init__()
+        self.embedding = nn.Embedding(net.vocab_size, net.input_features)
+        self.lstm = nn.LSTM(net.input_features, net.hidden_features, batch_first=True)
+
+    def forward(self, tokens, lengths, initial_hidden=None, initial_cell=None):
+        tokens = self.embedding(tokens)
+        tokens = torch.nn.utils.rnn.pack_padded_sequence(tokens, lengths, batch_first=True, enforce_sorted=False)
+        if initial_hidden is None:
+            x, (hidden, cell) = self.lstm(tokens)
+        else:
+            x, (hidden, cell) = self.lstm(tokens, (initial_hidden.permute(1, 0, 2), initial_cell.permute(1, 0, 2)))
+        x = torch.nn.utils.rnn.pad_packed_sequence(x, batch_first=True)
+        return x[0][:,-1], hidden.permute(1, 0, 2), cell.permute(1, 0, 2)
+
+
 def load_arch(device: str, args: argparse.Namespace) -> Tuple[torch.nn.Module, torch.nn.Module]:
     """
     Returns initialized encoder and decoder, to be used jointly as a Seq2seq model.
@@ -37,9 +54,9 @@ def load_arch(device: str, args: argparse.Namespace) -> Tuple[torch.nn.Module, t
                                      mode='jordan', dropout=args.dropout, bidirectional=False, embeddings=embeddings),
                           args.vocab_size)
     elif args.arch == 'lstm':
-        encoder = LSTM(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
+        encoder = Encoder(LSTM(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                        hidden_features=args.hidden_size, n_layers=args.n_layers, dropout=args.dropout,
-                       bidirectional=args.bidirectional, embeddings=embeddings)
+                       bidirectional=args.bidirectional, embeddings=embeddings))
         decoder = Decoder(LSTM(device=device, vocab_size=args.vocab_size, embedding_dim=args.embedding_size,
                                hidden_features=args.hidden_size*decoder_bidirectional_mul, n_layers=args.n_layers,
                                dropout=args.dropout, bidirectional=False, embeddings=embeddings), args.vocab_size)
