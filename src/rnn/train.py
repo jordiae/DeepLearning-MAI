@@ -11,6 +11,7 @@ from rnn.evaluate import prettify_eval, evaluate
 from src.rnn.utils import load_arch, init_train_logging
 import numpy as np
 from rnn.utils import LabelSmoothingLoss
+import time
 
 
 def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_encoder, optimizer_decoder, criterion,
@@ -26,8 +27,12 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
     logging.info(args)
     logging.info(encoder)
     logging.info(decoder)
+    total_params = sum(p.numel() for p in encoder.parameters() if p.requires_grad) +\
+                           sum(p.numel() for p in decoder.parameters() if p.requires_grad)
+    logging.info(f'Training {total_params} parameters')
     best_valid_metric = resume_info['best_valid_metric']
     epochs_without_improvement = resume_info['epochs_without_improvement']
+    t0 = time.time()
     for epoch in range(resume_info['epoch'], args.epochs):
         # train step (full epoch)
         encoder.train()
@@ -183,6 +188,8 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
         with open('resume_info.json', 'w') as f:
             json.dump(resume_info, f, indent=2)
 
+    t1 = time.time()
+    logging.info(f'Finished training in {t1-t0}s')
     encoder, decoder = load_arch(device, args)
     encoder.load_state_dict(torch.load('encoder_checkpoint_best.pt'))
     decoder.load_state_dict(torch.load('decoder_checkpoint_best.pt'))
