@@ -248,7 +248,7 @@ class PyTorchBaseRNN(nn.Module):
         """
         tokens = self.embedding(tokens)
         tokens = torch.nn.utils.rnn.pack_padded_sequence(tokens, lengths, batch_first=True, enforce_sorted=False)
-        if self.cell is None:
+        if not self.cell:
             cell = None
             if initial_hidden is None:
                 x, hidden = self.rnn(tokens)
