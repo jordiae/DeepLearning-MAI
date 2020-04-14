@@ -219,8 +219,8 @@ def main():
     parser.add_argument('--smooth-criterion', type=float, help='Smoothness for label-smoothing', default=0.1)
     parser.add_argument('--early-stop', type=int,
                         help='Patience in early stop in validation set (-1 -> no early stop)', default=6)
-    parser.add_argument('--weight-decay', type=float, help='Weight decay', default=0.001)
-    parser.add_argument('--dropout', type=float, help='Dropout in RNN and FC layers', default=0.1)
+    parser.add_argument('--weight-decay', type=float, help='Weight decay', default=0.0001)
+    parser.add_argument('--dropout', type=float, help='Dropout in RNN and FC layers', default=0.15)
     parser.add_argument('--embedding-size', type=int, help='Embedding size', default=64)
     parser.add_argument('--hidden-size', type=int, help='Hidden state size', default=128)
     parser.add_argument('--n-layers', type=int, help='Number of recurrent layers', default=1)
