@@ -108,7 +108,8 @@ def evaluate(data_loader: SortedShufflingDataLoader, encoder: torch.nn.Module, d
     return accuracy, correct, total_loss/total, len(data_loader.dataset), stats
 
 
-def evaluate_ensemble(data_loader: SortedShufflingDataLoader, models: List[torch.nn.Module], device: torch.device):
+def evaluate_ensemble(data_loader: SortedShufflingDataLoader, encoders: List[torch.nn.Module],
+                      decoders: List[torch.nn.Module], device: torch.device):
     """Evaluates ensemble of models with the given data loader"""
     avg_loss = 0
     correct = 0
@@ -117,9 +118,9 @@ def evaluate_ensemble(data_loader: SortedShufflingDataLoader, models: List[torch
     with torch.no_grad():
         for data, target, lengths in data_loader:
             data, target = data.to(device), target.to(device)
-            models[0].eval()
-            output = models[0](data, lengths)
-            for model in models[1:]:
+            encoders[0].eval()
+            output = encoders[0](data, lengths)
+            for model in encoders[1:]:
                 model.eval()
                 output += model(data)
 
@@ -142,11 +143,13 @@ if __name__ == '__main__':
     parser.add_argument('--problem-types', type=str, nargs='*', help='List of problems to load from dataset')
     parser.add_argument('--dataset-instances', type=int, default=100000,
                         help='Number of total instances we want to load from the dataset')
-    parser.add_argument('--checkpoint', type=str, default='checkpoint_best.pt',  help='Checkpoint name')
+    parser.add_argument('--decoder-checkpoint', type=str, default='decoder_checkpoint_best.pt',  help='Decoder checkpoint name')
+    parser.add_argument('--encoder-checkpoint', type=str, default='encoder_checkpoint_best.pt', help='Encoder checkpoint name')
     parser.add_argument('--subset', type=str, help='Data subset', default='test')
     parser.add_argument('--no-cuda', action='store_true', help='disables CUDA training')
     parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=2)
     args = parser.parse_args()
+
     log_path = f'eval-{args.subset}.log'
     logging.basicConfig(filename=log_path, level=logging.INFO)
     logging.getLogger('').addHandler(logging.StreamHandler())
@@ -154,28 +157,33 @@ if __name__ == '__main__':
 
     device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
 
-    models = []
+    encoders = []
+    decoders = []
     token2idx = None
     idx2token = None
     for path in args.models_path:
         with open(os.path.join(path, 'args.json'), 'r') as f:
             train_args = ArgsStruct(**json.load(f))
-            model = load_arch(train_args)
+            encoder, decoder = load_arch(device, train_args)
             token2idx = train_args.token2idx if token2idx is None else token2idx
-            idx2token = train_args.idx2token if token2idx is None else idx2token
+            idx2token = train_args.idx2token if idx2token is None else idx2token
             if train_args.token2idx != token2idx or train_args.idx2token != idx2token:
                 raise Exception('Incompatible models')
-        model.load_state_dict(torch.load(os.path.join(path, args.checkpoint)))
-        model.to(device)
-        models.append(model)
+        encoder.load_state_dict(torch.load(os.path.join(path, args.encoder_checkpoint)))
+        encoder.to(device)
+        encoders.append(encoder)
+
+        decoder.load_state_dict(torch.load(os.path.join(path, args.decoder_checkpoint)))
+        decoder.to(device)
+        decoders.append(decoder)
 
     dataset = MathDataset(path=data_path, subset=args.subset, token2idx=token2idx, idx2token=idx2token, sort=True,
                           total_lines=args.dataset_instances, problem_types=args.problem_types)
     data_loader = SortedShufflingDataLoader(dataset, mode='no_shuffle', batch_size=train_args.batch_size)
 
-    if len(models) == 1:
-        eval_res = evaluate(data_loader, models[0], device)
+    if len(encoders) == 1:
+        eval_res = evaluate(data_loader, encoders[0], decoders[0], train_args.vocab_size, device)
     else:
-        eval_res = evaluate_ensemble(data_loader, models, device)
+        eval_res = evaluate_ensemble(data_loader, encoders, decoders, device)
 
     logging.info(prettify_eval(args.subset, *eval_res))
