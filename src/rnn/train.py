@@ -189,14 +189,14 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
             json.dump(resume_info, f, indent=2)
 
     t1 = time.time()
-    logging.info(f'Finished training in {t1-t0}s')
+    logging.info(f'Finished training in {t1-t0:.1f}s')
     encoder, decoder = load_arch(device, args)
     encoder.load_state_dict(torch.load('encoder_checkpoint_best.pt'))
     decoder.load_state_dict(torch.load('decoder_checkpoint_best.pt'))
     encoder.to(device)
     decoder.to(device)
     eval_res = evaluate(valid_loader, encoder, decoder, args.vocab_size, device)
-    logging.info(prettify_eval('train', *eval_res))
+    logging.info(prettify_eval('valid', *eval_res))
 
 
 def main():
