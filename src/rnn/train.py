@@ -24,7 +24,7 @@ def train(args, train_loader, valid_loader, encoder, decoder, device, optimizer_
     writer = SummaryWriter()
     with open('args.json', 'w') as f:
         json.dump(args.__dict__, f, indent=2)
-    logging.info(args)
+
     logging.info(encoder)
     logging.info(decoder)
     total_params = sum(p.numel() for p in encoder.parameters() if p.requires_grad) +\
