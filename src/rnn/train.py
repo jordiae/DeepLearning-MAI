@@ -203,7 +203,10 @@ def main():
     # Settings
     parser = argparse.ArgumentParser(description="Train a RNN for Deepmind's Mathematics Dataset")
     parser.add_argument('--arch', type=str, help='Architecture', default='elman')
-    parser.add_argument('--problem-types', type=str, nargs='*', help='List of problems to load from dataset')
+    parser.add_argument('--problem-types', type=str, nargs='*', help='List of problems to load from dataset',
+                        default = ['numbers__base_conversion.txt', 'numbers__div_remainder.txt', 'numbers__gcd.txt',
+                                   'numbers__is_factor.txt', 'numbers__is_prime.txt', 'numbers__lcm.txt',
+                                   'numbers__list_prime_factors.txt', 'numbers__place_value.txt', 'numbers__round_number.txt'])
     parser.add_argument('--dataset-instances', type=int, default=100000,
                         help='Number of total instances we want to load from the dataset')
     parser.add_argument('--epochs', type=int, help='Number of epochs', default=100)
@@ -211,13 +214,13 @@ def main():
     parser.add_argument('--momentum', type=float, help='Momentum', default=0.9)
     parser.add_argument('--no-cuda', action='store_true', help='disables CUDA training')
     parser.add_argument('--optimizer', type=str, help='Optimizer', default='Adam')
-    parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=32)
+    parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=64)
     parser.add_argument('--criterion', type=str, help='Criterion', default='xent')
     parser.add_argument('--smooth-criterion', type=float, help='Smoothness for label-smoothing', default=0.1)
     parser.add_argument('--early-stop', type=int,
-                        help='Patience in early stop in validation set (-1 -> no early stop)', default=5)
+                        help='Patience in early stop in validation set (-1 -> no early stop)', default=6)
     parser.add_argument('--weight-decay', type=float, help='Weight decay', default=0.001)
-    parser.add_argument('--dropout', type=float, help='Dropout in RNN and FC layers', default=0.25)
+    parser.add_argument('--dropout', type=float, help='Dropout in RNN and FC layers', default=0.1)
     parser.add_argument('--embedding-size', type=int, help='Embedding size', default=64)
     parser.add_argument('--hidden-size', type=int, help='Hidden state size', default=128)
     parser.add_argument('--n-layers', type=int, help='Number of recurrent layers', default=1)
