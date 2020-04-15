@@ -32,10 +32,10 @@ def create_train_bat(parameters):
 def create_train_script(parameters):
     relative_train_path = '/'.join(['..', '..', '..', 'src', 'rnn', 'train.py'])
     script = '''#!/bin/bash
-source ../../venv/bin/activate
-src_path="$(realpath ../../src)"
+
+src_path="$(realpath ../../../src)"
 export PYTHONPATH="${PYTHONPATH}:${src_path}"'''
-    script += f'\n python {relative_train_path} {parameters}'
+    script += f'\npython {relative_train_path} {parameters}'
     return script
 
 
