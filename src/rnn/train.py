@@ -218,7 +218,7 @@ def main():
     parser.add_argument('--criterion', type=str, help='Criterion', default='xent')
     parser.add_argument('--smooth-criterion', type=float, help='Smoothness for label-smoothing', default=0.1)
     parser.add_argument('--early-stop', type=int,
-                        help='Patience in early stop in validation set (-1 -> no early stop)', default=6)
+                        help='Patience in early stop in validation set (-1 -> no early stop)', default=10)
     parser.add_argument('--weight-decay', type=float, help='Weight decay', default=0.001)
     parser.add_argument('--dropout', type=float, help='Dropout in RNN and FC layers', default=0.1)
     parser.add_argument('--embedding-size', type=int, help='Embedding size', default=64)
