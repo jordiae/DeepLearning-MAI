@@ -237,7 +237,7 @@ def main():
 
     # Load train and validation datasets
     logging.info('===> Loading datasets')
-    data_path = os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0', 'train-easy')
+    data_path = os.path.join('..', '..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0', 'train-easy')
     train_dataset = MathDataset(path=data_path, subset='train', sort=True, total_lines=args.dataset_instances,
                                 problem_types=args.problem_types)
     token2idx, idx2token, unk_token_idx = train_dataset.get_vocab()

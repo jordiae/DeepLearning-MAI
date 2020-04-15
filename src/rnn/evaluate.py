@@ -155,7 +155,7 @@ if __name__ == '__main__':
     log_path = f'eval-{args.subset}.log'
     logging.basicConfig(filename=log_path, level=logging.INFO)
     logging.getLogger('').addHandler(logging.StreamHandler())
-    data_path = os.path.join('..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0', 'train-easy')
+    data_path = os.path.join('..', '..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0', 'train-easy')
 
     device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
 
