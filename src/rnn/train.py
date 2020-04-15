@@ -8,7 +8,7 @@ from rnn.dataset import MathDataset, SortedShufflingDataLoader
 import json
 from torch.utils.tensorboard import SummaryWriter
 from rnn.evaluate import prettify_eval, evaluate
-from src.rnn.utils import load_arch, init_train_logging
+from rnn.utils import load_arch, init_train_logging
 import numpy as np
 from rnn.utils import LabelSmoothingLoss
 import time
