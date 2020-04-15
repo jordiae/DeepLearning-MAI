@@ -130,6 +130,17 @@ def init_train_logging():
     logging.getLogger('').addHandler(logging.StreamHandler())
 
 
+def init_eval_logging(set_: str):
+    """Sets logging such that the output is both saved in a file and output to stdout"""
+    # TODO: Refactor
+    log_path = f'eval-{set_}.log'
+    if os.path.exists('checkpoint_last.pt'):
+        logging.basicConfig(filename=log_path, level=logging.INFO, filemode='a')
+    else:
+        logging.basicConfig(filename=log_path, level=logging.INFO)
+    logging.getLogger('').addHandler(logging.StreamHandler())
+
+
 class LabelSmoothingLoss(nn.Module):
     def __init__(self, smoothing=0.0):
         super(LabelSmoothingLoss, self).__init__()

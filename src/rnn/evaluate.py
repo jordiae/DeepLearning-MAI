@@ -1,5 +1,4 @@
 import torch
-import torch.nn.functional as F
 import argparse
 import os
 import json
@@ -10,6 +9,8 @@ from typing import List
 from torch import nn
 from typing import Tuple
 from typing import Dict
+from rnn.utils import init_eval_logging
+from typing import Union
 
 
 class ArgsStruct:
@@ -37,8 +38,11 @@ def prettify_eval(set_: str, accuracy: float, correct: int, avg_loss: float, n_i
 
 
 def evaluate(data_loader: SortedShufflingDataLoader, encoder: torch.nn.Module, decoder: torch.nn.Module,
-             vocab_size: int, device: torch.device) -> Tuple[float, int, float, int, Dict[str, List[int]]]:
+             vocab_size: int, device: torch.device, dataset: Union[MathDataset, None] = None,
+             verbose: bool = False) -> Tuple[float, int, float, int, Dict[str, List[int]]]:
     """Evaluated a model with the given data loader"""
+    if verbose and dataset is None:
+        raise RuntimeError('Verbose set to True, but no dataset!')
     correct = 0
     total = 0
     total_loss = 0
@@ -68,6 +72,8 @@ def evaluate(data_loader: SortedShufflingDataLoader, encoder: torch.nn.Module, d
             # In inference, we don't apply Teacher forcing
             # Greedy inference (TODO: If we have time, beam search)
             # For efficiency, we don't wait until the output sentence is complete (<EOS>).
+            if verbose:
+                outputs = []
             for tgt_idx, tgt in enumerate(transposed_tgt_tokens):
                 tgt = tgt.view(tgt.shape[0], 1)
                 if first:
@@ -93,6 +99,8 @@ def evaluate(data_loader: SortedShufflingDataLoader, encoder: torch.nn.Module, d
 
                 batch_correct[non_zero_idx] += torch.eq(torch.argmax(decoder_x, dim=1),
                                                         transposed_tgt_tokens[tgt_idx + 1])[non_zero_idx]
+                if verbose:
+                    outputs.append(torch.argmax(decoder_x[non_zero_idx], dim=1))
                 if tgt_idx == transposed_tgt_tokens.shape[0] - 2:  # <EOS>
                     break
 
@@ -106,55 +114,40 @@ def evaluate(data_loader: SortedShufflingDataLoader, encoder: torch.nn.Module, d
                 stats[problem_types[tgt_idx]][1] += 1
             total += tgt_tokens.size(0)
 
+            if verbose:
+                outputs = list(map(list, zip(*outputs)))
+                for tgt_idx, output in enumerate(outputs):
+                    logging.info(problem_types[tgt_idx])
+                    logging.info(f'Question: {dataset.decode(src_tokens[tgt_idx])}')
+                    logging.info(f'Hypothesis: {dataset.decode(output[tgt_lengths[tgt_idx]])}')
+                    logging.info(f'Target: {dataset.decode(tgt_tokens[tgt_lengths[tgt_idx]])}')
+                    logging.info('-------')
+
     accuracy = 100 * correct / total
     return accuracy, correct, total_loss/total, total, stats
-
-
-def evaluate_ensemble(data_loader: SortedShufflingDataLoader, encoders: List[torch.nn.Module],
-                      decoders: List[torch.nn.Module], device: torch.device):
-    """Evaluates ensemble of models with the given data loader"""
-    avg_loss = 0
-    correct = 0
-    y_output = []
-    y_ground_truth = []
-    with torch.no_grad():
-        for data, target, lengths in data_loader:
-            data, target = data.to(device), target.to(device)
-            encoders[0].eval()
-            output = encoders[0](data, lengths)
-            for model in encoders[1:]:
-                model.eval()
-                output += model(data)
-
-            avg_loss += F.binary_cross_entropy(output, target, reduction='sum').item()  # sum batch loss
-            pred = output.argmax(dim=1, keepdim=True)  # index of the max log-probability
-            correct += pred.eq(target.view_as(pred)).sum().item()
-            y_output += torch.squeeze(pred).tolist()
-            y_ground_truth += torch.squeeze(target).tolist()
-
-        avg_loss /= len(data_loader.dataset)
-    accuracy = 100. * correct / len(data_loader.dataset)
-    return accuracy, correct, avg_loss, len(data_loader.dataset)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Evaluate a RNN for Deepmind's Mathematics dataset")
     parser.add_argument('--arch', type=str, help='Architecture')
     parser.add_argument('--models-path', type=str, help='Path to model directory. If more than one path is provided, an'
-                                                        'ensemble of models os loaded', nargs='+')
+                                                        'ensemble of models os loaded (not yet implemetned)', nargs='+')
     parser.add_argument('--problem-types', type=str, nargs='*', help='List of problems to load from dataset')
     parser.add_argument('--dataset-instances', type=int, default=100000,
                         help='Number of total instances we want to load from the dataset')
-    parser.add_argument('--decoder-checkpoint', type=str, default='decoder_checkpoint_best.pt',  help='Decoder checkpoint name')
-    parser.add_argument('--encoder-checkpoint', type=str, default='encoder_checkpoint_best.pt', help='Encoder checkpoint name')
+    parser.add_argument('--decoder-checkpoint', type=str, default='decoder_checkpoint_best.pt',
+                        help='Decoder checkpoint name')
+    parser.add_argument('--encoder-checkpoint', type=str, default='encoder_checkpoint_best.pt',
+                        help='Encoder checkpoint name')
     parser.add_argument('--subset', type=str, help='Data subset', default='test')
     parser.add_argument('--no-cuda', action='store_true', help='disables CUDA training')
-    parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=2)
+    parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=64)
+    parser.add_argument('--verboseval'
+                        '', action='store_true', help='Enables verbose mode (prints outputs and targets)')
     args = parser.parse_args()
 
-    log_path = f'eval-{args.subset}.log'
-    logging.basicConfig(filename=log_path, level=logging.INFO)
-    logging.getLogger('').addHandler(logging.StreamHandler())
+    init_eval_logging(args.subset)
+
     data_path = os.path.join('..', '..', '..', 'data', 'mathematics', 'mathematics_dataset-v1.0', 'train-easy')
 
     device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
@@ -184,8 +177,9 @@ if __name__ == '__main__':
     data_loader = SortedShufflingDataLoader(dataset, mode='no_shuffle', batch_size=train_args.batch_size)
 
     if len(encoders) == 1:
-        eval_res = evaluate(data_loader, encoders[0], decoders[0], train_args.vocab_size, device)
+        eval_res = evaluate(data_loader, encoders[0], decoders[0], train_args.vocab_size, device, dataset,
+                            verbose=args.verbose)
     else:
-        eval_res = evaluate_ensemble(data_loader, encoders, decoders, device)
+        raise NotImplementedError()
 
     logging.info(prettify_eval(args.subset, *eval_res))
