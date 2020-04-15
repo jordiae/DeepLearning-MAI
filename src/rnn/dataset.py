@@ -55,7 +55,7 @@ class MathDataset(Dataset):
 
         self.read_lines = [(i+1) * (int((total_lines * (self.proportions[self.subset]) // 100) / len(self.problem_types)))
                            for i in range(len(self.problem_types))]
-        self.read_lines[-1] += ((total_lines* (self.proportions[self.subset]) // 100) % len(self.problem_types))
+        self.read_lines[-1] += ((total_lines * (self.proportions[self.subset]) // 100) % len(self.problem_types))
 
         def check_idx(i: int, sub: str) -> bool:
             """
@@ -68,9 +68,10 @@ class MathDataset(Dataset):
             """
             if sub == 'train' and i % 100 < self.proportions['train']:
                 return True
-            if sub == 'valid' and i % 100 < (self.proportions['train'] + self.proportions['valid']):
+            elif sub == 'valid' and self.proportions['train'] <= i % 100 < (self.proportions['train'] +
+                                                                            self.proportions['valid']):
                 return True
-            if sub == 'test' and i % 100 >= (self.proportions['train'] + self.proportions['valid']):
+            elif sub == 'test' and i % 100 >= (self.proportions['train'] + self.proportions['valid']):
                 return True
             return False
 
