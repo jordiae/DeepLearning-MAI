@@ -142,8 +142,7 @@ if __name__ == '__main__':
     parser.add_argument('--subset', type=str, help='Data subset', default='test')
     parser.add_argument('--no-cuda', action='store_true', help='disables CUDA training')
     parser.add_argument('--batch-size', type=int, help='Mini-batch size', default=64)
-    parser.add_argument('--verboseval'
-                        '', action='store_true', help='Enables verbose mode (prints outputs and targets)')
+    parser.add_argument('--verbose', action='store_true', help='Enables verbose mode (prints outputs and targets)')
     args = parser.parse_args()
 
     init_eval_logging(args.subset)
