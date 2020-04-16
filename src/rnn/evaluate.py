@@ -167,10 +167,12 @@ if __name__ == '__main__':
             idx2token = train_args.idx2token if idx2token is None else idx2token
             if train_args.token2idx != token2idx or train_args.idx2token != idx2token:
                 raise Exception('Incompatible models')
-        encoder.load_state_dict(torch.load(os.path.join(path, args.encoder_checkpoint)))
+        encoder.load_state_dict(torch.load(os.path.join(path, args.encoder_checkpoint),
+                                           map_location='cpu' if args.no_cuda else None))
         encoder.to(device)
 
-        decoder.load_state_dict(torch.load(os.path.join(path, args.decoder_checkpoint)))
+        decoder.load_state_dict(torch.load(os.path.join(path, args.decoder_checkpoint),
+                                           map_location='cpu' if args.no_cuda else None))
         decoder.to(device)
 
         dataset = MathDataset(path=data_path, subset=args.subset, sort=True, token2idx = token2idx, idx2token = idx2token,

@@ -169,6 +169,7 @@ class MathDataset(Dataset):
         self.Y = [self.Y[i] for i in sorted_idx]
         self.src_lengths = [self.src_lengths[i] for i in sorted_idx]
         self.tgt_lengths = [self.tgt_lengths[i] for i in sorted_idx]
+        self.stored_problem_types = [self.stored_problem_types[i] for i in sorted_idx]
         self.sorted = True
 
     def sort_by_lengths(self):
