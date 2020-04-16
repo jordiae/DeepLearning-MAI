@@ -121,9 +121,9 @@ def evaluate(data_loader: SortedShufflingDataLoader, encoder: torch.nn.Module, d
                 for tgt_idx, output in enumerate(outputs):
                     if random.randrange(50) == 1:
                         print(problem_types[tgt_idx])
-                        print(f'Question: {dataset.decode(src_tokens[tgt_idx])}')
-                        print(f'Hypothesis: {dataset.decode(outputs[tgt_idx])}')
-                        print(f'Target: {dataset.decode(tgt_tokens[tgt_idx])}')
+                        print(f'Question: {dataset.decode(src_tokens[tgt_idx])[:src_lengths[tgt_idx]]}')
+                        print(f'Hypothesis: {dataset.decode(output[:tgt_lengths[tgt_idx]-1])}')
+                        print(f'Target: {dataset.decode(tgt_tokens[tgt_idx][1:(tgt_lengths[tgt_idx])])}')
                         print('-------')
 
     accuracy = 100 * correct / total
