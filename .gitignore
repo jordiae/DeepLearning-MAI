@@ -2,6 +2,5 @@
 venv/*
 data/mit67/*
 data/mathematics/*
-experiments/*
 *.pyc
 __pycache__
