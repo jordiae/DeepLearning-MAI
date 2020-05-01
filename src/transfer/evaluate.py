@@ -26,7 +26,8 @@ def prettify_eval(set_: str, accuracy: float, correct: int, avg_loss: float, cla
         avg_loss, correct, n_instances, accuracy, class_report)
 
 
-def evaluate(data_loader: torch.utils.data.DataLoader, model: TransferModel, device: torch.device, transform: Optional):
+def evaluate(data_loader: torch.utils.data.DataLoader, model: TransferModel, device: torch.device,
+             transform: Optional = None):
     model.eval()
     avg_loss = 0
     correct = 0
