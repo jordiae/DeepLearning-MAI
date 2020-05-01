@@ -62,9 +62,9 @@ class TransferModel(nn.Module):
         if self.preconv is not None and self.transfer_strategy == 'fine-tuning':
             return chain(self.preconv.parameters(), self.model.parameters())
         elif self.preconv is not None and self.transfer_strategy == 'feature-extraction':
-            return chain(self.preconv.parameters(), self.get_last_layer(self.model.parameters()))
+            return chain(self.preconv.parameters(), self.get_last_layer(self.model).parameters())
         else:
-            return self.get_last_layer(self.model.parameters())
+            return self.get_last_layer(self.model).parameters()
 
     def get_pretrained_parameters(self) -> Iterable[nn.Parameter]:
         return self.model.parameters()
