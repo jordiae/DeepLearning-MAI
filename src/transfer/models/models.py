@@ -61,7 +61,8 @@ class TransferModel(nn.Module):
     def get_trainable_parameters(self) -> Iterable[nn.Parameter]:
         if self.preconv is not None and self.transfer_strategy == 'fine-tuning':
             return chain(self.preconv.parameters(), self.model.parameters())
-        elif self.preconv is not None and self.transfer_strategy == 'feature-extraction':
+        elif self.preconv is not None and self.transfer_strategy in ['feature-extraction',
+                                                                     'feature-extraction-freeze-batchnorm-dropout']:
             return chain(self.preconv.parameters(), self.get_last_layer(self.model).parameters())
         else:
             return self.get_last_layer(self.model).parameters()
