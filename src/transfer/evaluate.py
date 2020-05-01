@@ -117,7 +117,7 @@ if __name__ == '__main__':
         models.append((model, transform_in))
 
     if len(models) == 1:
-        eval_res = evaluate(data_loader, models[0], device, transform_in)
+        eval_res = evaluate(data_loader, model, device, transform_in)
     else:
         eval_res = evaluate_ensemble(data_loader, models, device)
 
