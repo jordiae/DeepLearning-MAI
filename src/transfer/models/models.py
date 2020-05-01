@@ -63,6 +63,8 @@ class TransferModel(nn.Module):
             return chain(self.preconv.parameters(), self.model.parameters())
         elif self.preconv is not None and self.transfer_strategy == 'feature-extraction':
             return chain(self.preconv.parameters(), self.get_last_layer(self.model.parameters()))
+        else:
+            return self.get_last_layer(self.model.parameters())
 
     def get_pretrained_parameters(self) -> Iterable[nn.Parameter]:
         return self.model.parameters()
