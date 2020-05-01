@@ -3,5 +3,6 @@ venv/*
 data/mit67/*
 data/mathematics/*
 experiments/*
+pretrained_models/*
 *.pyc
 __pycache__
