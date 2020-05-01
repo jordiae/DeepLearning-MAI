@@ -27,7 +27,7 @@ def load_model(pretrained_model: str, pre_conv: bool, mode: str, transfer_strate
 
 
 class ComposedOptimizer:
-    def __init__(self, optimizers: List[torch.nn.Optimizer]):
+    def __init__(self, optimizers: List[torch.optim.Optimizer]):
         self.optimizers = optimizers
 
     def zero_grad(self):

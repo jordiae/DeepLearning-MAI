@@ -73,18 +73,18 @@ class TransferModel(nn.Module):
         else:
             return chain(self.preconv.parameters(), self.get_last_layer(self.model.parameters()))
 
-    def train_mode(self):
+    def train(self, *args, **kwargs):
         if self.preconv is not None:
-            self.preconv.train()
+            self.preconv.train(*args, **kwargs)
         if self.transfer_strategy == 'fine-tuning':
-            self.model.train()
+            self.model.train(*args, **kwargs)
         else:
-            self.get_last_layer(self.model).train()
+            self.get_last_layer(self.model).train(*args, **kwargs)
 
-    def eval_mode(self):
+    def eval(self, *args, **kwargs):
         if self.preconv is not None:
-            self.preconv.eval()
-        self.model.eval()
+            self.preconv.eval(*args, **kwargs)
+        self.model.eval(*args, **kwargs)
 
 
 def build_pretrained(pretrained_model: str, pretrained: bool, n_classes: int, input_size: Tuple[int, int],

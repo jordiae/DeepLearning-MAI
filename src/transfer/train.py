@@ -14,11 +14,10 @@ from transfer.utils import load_model
 from transfer.utils import LabelSmoothingLoss
 import numpy as np
 from transfer.utils import ComposedOptimizer
-from transfer.models import TransferModel
 
 
 def train(args: argparse.Namespace, train_loader: torch.utils.data.DataLoader,
-          valid_loader: torch.utils.data.DataLoader, model: TransferModel, device: torch.device,
+          valid_loader: torch.utils.data.DataLoader, model: nn.Module, device: torch.device,
           optimizer: ComposedOptimizer, criterion: nn.Module, seed: int =42):
 
     torch.manual_seed(seed)
@@ -34,7 +33,7 @@ def train(args: argparse.Namespace, train_loader: torch.utils.data.DataLoader,
 
     for epoch in range(args.epochs):
         # train step (full epoch)
-        model.train_mode()
+        model.train()
         logging.info(f'Epoch {epoch+1} |')
         loss_train = 0.0
         total = 0
@@ -61,7 +60,7 @@ def train(args: argparse.Namespace, train_loader: torch.utils.data.DataLoader,
         correct = 0
         total = 0
         loss_val = 0
-        model.eval_mode()
+        model.eval()
         with torch.no_grad():
             for data in valid_loader:
                 images, labels = data[0].to(device), data[1].to(device)
@@ -133,8 +132,8 @@ def main():
 
     logging.info('===> Building model')
     logging.info('Resuming training from pre-trained checkpoint...')
-    model, size_transform = load_model(args.pre_conv, args.from_pretrained, mode='train',
-                                       transfer_strategy=args.transfer_strategy)
+    model, size_transform = load_model(args.from_pretrained, mode='train',
+                                       transfer_strategy=args.transfer_strategy, pre_conv=args.pre_conv)
 
     logging.info('===> Loading datasets')
     data_path = os.path.join('..', '..', 'data', 'mit67', args.data)

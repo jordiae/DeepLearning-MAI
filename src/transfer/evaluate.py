@@ -27,7 +27,7 @@ def prettify_eval(set_: str, accuracy: float, correct: int, avg_loss: float, cla
 
 
 def evaluate(data_loader: torch.utils.data.DataLoader, model: TransferModel, device: torch.device, transform: Optional):
-    model.eval_mode()
+    model.eval()
     avg_loss = 0
     correct = 0
     y_output = []
@@ -61,10 +61,10 @@ def evaluate_ensemble(data_loader: torch.utils.data.DataLoader, models: Iterable
         for data, target in data_loader:
             data, target = data.to(device), target.to(device)
             data_t = models[0][1](data)
-            models[0][0].eval_mode()
+            models[0][0].eval()
             output = models[0][0](data_t)
             for model, transform in models[1:]:
-                model.eval_mode()
+                model.eval()
                 data_t = transform(data)
                 output += model(data_t)
 
