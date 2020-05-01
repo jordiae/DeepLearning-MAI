@@ -111,8 +111,8 @@ if __name__ == '__main__':
     for path in args.models_path:
         with open(os.path.join(path, 'args.json'), 'r') as f:
             train_args = ArgsStruct(**json.load(f))
-        model, transform_in = load_model(train_args.model, train_args.pre_conv, mode='eval',
-                                         transfer_strategy=args.transfer_strategy)
+        model, transform_in = load_model(train_args.from_pretrained, mode='eval',
+                                         transfer_strategy=train_args.transfer_strategy, pre_conv=train_args.pre_conv)
         model.load_state_dict(torch.load(os.path.join(path, args.checkpoint)))
         model.to(device)
         models.append((model, transform_in))
