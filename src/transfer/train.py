@@ -30,6 +30,8 @@ def train(args: argparse.Namespace, train_loader: torch.utils.data.DataLoader,
         json.dump(args.__dict__, f, indent=2)
     logging.info(args)
     logging.info(model)
+    best_valid_metric = 0.0
+    epochs_without_improvement = 0
 
     for epoch in range(args.epochs):
         # train step (full epoch)
@@ -79,7 +81,7 @@ def train(args: argparse.Namespace, train_loader: torch.utils.data.DataLoader,
         torch.save(model.state_dict(), 'checkpoint_last.pt')
         if accuracy > best_valid_metric:
             epochs_without_improvement = 0
-            best_valid_metric = loss_val/total if args.autoencoder else accuracy
+            best_valid_metric = accuracy
             torch.save(model.state_dict(), 'checkpoint_best.pt')
             logging.info(f'best valid accuracy: {accuracy:.2f}')
         else:
