@@ -78,7 +78,7 @@ class TransferModel(nn.Module):
     def train(self, *args, **kwargs):
         if self.preconv is not None:
             self.preconv.train(*args, **kwargs)
-        if self.transfer_strategy == 'fine-tuning':
+        if self.transfer_strategy in ['fine-tuning', 'feature-extraction-freeze-batchnorm-dropout']:
             self.model.train(*args, **kwargs)
         else:
             self.get_last_layer(self.model).train(*args, **kwargs)

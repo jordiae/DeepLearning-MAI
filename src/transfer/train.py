@@ -101,8 +101,10 @@ def main():
     # Settings
     parser = argparse.ArgumentParser(description='Train a CNN for mit67, based on a pre-train model')
     parser.add_argument('--from-pretrained', type=str, help='Pre-trained model to learn', default='resnet-18-imagenet')
-    parser.add_argument('--transfer-strategy', type=str, help='Transfer learning strategy (fine-tuning or'
-                                                              'feature-extraction)', default='fine-tuning')
+    parser.add_argument('--transfer-strategy', type=str, help='Transfer learning strategy (fine-tuning,'
+                                                              'feature-extraction, or'
+                                                              'feature-extraction-freeze-batchnorm-dropout)',
+                        default='fine-tuning')
     parser.add_argument('--pre-conv', action='store_true', help='Whether to add a new convolutional layer')
     parser.add_argument('--data', type=str, help='Dataset', default='256x256-split')
     parser.add_argument('--epochs', type=int, help='Number of epochs', default=100)
@@ -123,13 +125,12 @@ def main():
     if args.lr_pretrained is None:
         args.lr_pretrained = args.lr
 
-    assert args.transfer_strategy in ['fine-tuning', 'feature-extraction']
+    assert args.transfer_strategy in ['fine-tuning', 'feature-extraction',
+                                      'feature-extraction-freeze-batchnorm-dropout']
 
     log_path = 'train.log'
-    if os.path.exists('checkpoint_last.pt'):
-        logging.basicConfig(filename=log_path, level=logging.INFO, filemode='a')
-    else:
-        logging.basicConfig(filename=log_path, level=logging.INFO)
+
+    logging.basicConfig(filename=log_path, level=logging.INFO)
     logging.getLogger('').addHandler(logging.StreamHandler())
 
     logging.info('===> Building model')
@@ -203,7 +204,8 @@ def main():
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False)
 
-    if args.transfer_strategy == 'feature_extraction' or args.lr == args.lr_pretrained:
+    if args.transfer_strategy in ['feature_extraction', 'feature-extraction-freeze-batchnorm-dropout'] or \
+            args.lr == args.lr_pretrained:
         optimizer = optim.Adam(model.get_trainable_parameters(), lr=args.lr, weight_decay=args.weight_decay)
     else:
         optimizer_pretrained = optim.Adam(model.get_pretrained_parameters(), lr=args.lr, weight_decay=args.weight_decay)
