@@ -28,7 +28,7 @@ class InitialConv(nn.Module):
         self.conv1 = nn.Conv2d(3, 9, 3, padding=1)
         self.batchnorm1 = nn.BatchNorm2d(9)
         self.conv2 = nn.Conv2d(9, 3, 3, padding=1)
-        self.batchnorm2 = self.nn.BatchNorm2d(3)
+        self.batchnorm2 = nn.BatchNorm2d(3)
 
     def forward(self, x: torch.Tensor):
         x = self.conv1(x)
@@ -71,9 +71,9 @@ class TransferModel(nn.Module):
 
     def get_new_parameters(self) -> Iterable[nn.Parameter]:
         if self.preconv is None:
-            return self.get_last_layer(self.model.parameters())
+            return self.get_last_layer(self.model).parameters()
         else:
-            return chain(self.preconv.parameters(), self.get_last_layer(self.model.parameters()))
+            return chain(self.preconv.parameters(), self.get_last_layer(self.model).parameters())
 
     def train(self, *args, **kwargs):
         if self.preconv is not None:
@@ -107,7 +107,7 @@ def build_pretrained(pretrained_model: str, pretrained: bool, n_classes: int, in
     else:
         raise NotImplementedError(f'Pretrained model: {pretrained_model}')
     os.chdir(current_dir)
-    model = TransferModel(InitialConv if preconv else None, pretrained_model, get_last_layer, transfer_strategy)
+    model = TransferModel(InitialConv() if preconv else None, pretrained_model, get_last_layer, transfer_strategy)
     return model, transform_in
 
 
