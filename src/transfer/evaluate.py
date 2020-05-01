@@ -5,29 +5,38 @@ import argparse
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import os
-from transfer.dataset import Mit67Dataset
+from cnn.dataset import Mit67Dataset
 import json
-from transfer.utils import load_arch
+from transfer.utils import load_model
+from transfer.models import TransferModel
 import logging
+from typing import Iterable
+from typing import Any
+from typing import Tuple
+from typing import Optional
+
 
 class ArgsStruct:
     def __init__(self, **entries):
         self.__dict__.update(entries)
 
 
-def prettify_eval(set_, accuracy, correct, avg_loss, class_report, n_instances):
+def prettify_eval(set_: str, accuracy: float, correct: int, avg_loss: float, class_report: str, n_instances: int):
     return '\n' + set_ + ' set average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n{}\n'.format(
         avg_loss, correct, n_instances, accuracy, class_report)
 
 
-def evaluate(data_loader, model, device):
-    model.eval()
+def evaluate(data_loader: torch.utils.data.DataLoader, model: TransferModel, device: torch.device, transform: Optional):
+    model.eval_mode()
     avg_loss = 0
     correct = 0
     y_output = []
     y_ground_truth = []
     with torch.no_grad():
         for data, target in data_loader:
+            if transform is not None:
+                for idx, e in enumerate(data):
+                    data[idx] = transform(e)
             data, target = data.to(device), target.to(device)
             output = model(data)
             avg_loss += F.cross_entropy(output, target, reduction='sum').item()  # sum batch loss
@@ -42,7 +51,8 @@ def evaluate(data_loader, model, device):
     return accuracy, correct, avg_loss, class_report, len(data_loader.dataset)
 
 
-def evaluate_ensemble(data_loader, models, device):
+def evaluate_ensemble(data_loader: torch.utils.data.DataLoader, models: Iterable[Tuple[TransferModel, Any]],
+                                                                        device: torch.device):
     avg_loss = 0
     correct = 0
     y_output = []
@@ -50,11 +60,13 @@ def evaluate_ensemble(data_loader, models, device):
     with torch.no_grad():
         for data, target in data_loader:
             data, target = data.to(device), target.to(device)
-            models[0].eval()
-            output = models[0](data)
-            for model in models[1:]:
-                model.eval()
-                output += model(data)
+            data_t = models[0][1](data)
+            models[0][0].eval_mode()
+            output = models[0][0](data_t)
+            for model, transform in models[1:]:
+                model.eval_mode()
+                data_t = transform(data)
+                output += model(data_t)
 
             avg_loss += F.cross_entropy(output, target, reduction='sum').item()  # sum batch loss
             pred = output.argmax(dim=1, keepdim=True)  # index of the max log-probability
@@ -92,22 +104,20 @@ if __name__ == '__main__':
             ])
     dataset = Mit67Dataset(os.path.join('..', '..', 'data', 'mit67', args.data, args.subset), transform=transform)
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
-    device = torch.device("cuda:0" if not args.no_cuda and torch.cuda.is_available() else "cpu")
+    device = torch.device('cuda:0' if not args.no_cuda and torch.cuda.is_available() else 'cpu')
 
     models = []
     for path in args.models_path:
-        if args.arch == 'PyramidCNN':
-            with open(os.path.join(path, 'args.json'), 'r') as f:
-                    train_args = ArgsStruct(**json.load(f))
-            model = load_arch(train_args)
-        else:
-            model = load_arch(None)
+        with open(os.path.join(path, 'args.json'), 'r') as f:
+            train_args = ArgsStruct(**json.load(f))
+        model, transform_in = load_model(train_args.model, train_args.pre_conv, mode='eval',
+                                         transfer_strategy=args.transfer_strategy)
         model.load_state_dict(torch.load(os.path.join(path, args.checkpoint)))
         model.to(device)
-        models.append(model)
+        models.append((model, transform_in))
 
     if len(models) == 1:
-        eval_res = evaluate(data_loader, models[0], device)
+        eval_res = evaluate(data_loader, models[0], device, transform_in)
     else:
         eval_res = evaluate_ensemble(data_loader, models, device)
 
