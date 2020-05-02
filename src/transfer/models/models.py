@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 import os
 import pathlib
+import imp
 import torchvision
 from typing import Tuple
 from itertools import chain
@@ -104,6 +105,17 @@ def build_pretrained(pretrained_model: str, pretrained: bool, n_classes: int, in
             return resnet.fc
 
         get_last_layer = get_last_layer_resnet
+    elif pretrained_model == 'food-11':
+        MainModel = imp.load_source('MainModel', os.path.join('pretrained_models','food_11', 'model_converted.py'))
+        pretrained_model = torch.load(os.path.join('pretrained_models','food_11', 'model_converted.pth'))
+        pretrained_model.dense_3 = LinearClassifier(256, n_classes)
+        transform_in = None
+
+        def get_last_layer_food_11(model):
+            return model.dense_3
+
+        get_last_layer = get_last_layer_food_11
+
     else:
         raise NotImplementedError(f'Pretrained model: {pretrained_model}')
     os.chdir(current_dir)
