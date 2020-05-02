@@ -10,6 +10,7 @@ from itertools import chain
 from typing import Optional
 from typing import Callable
 from typing import Iterable
+import albumentations as A
 
 SCRIPT_PATH = os.path.join(pathlib.Path(__file__).parent.absolute())
 
@@ -120,8 +121,10 @@ def build_pretrained(pretrained_model: str, pretrained: bool, n_classes: int, in
     elif pretrained_model == 'diabetic-retinop':
         imp.load_source('model', os.path.join('pretrained_models', 'diabetic_retinop', 'model.py'))
         pretrained_model = torch.load(os.path.join('pretrained_models', 'diabetic_retinop', 'model.pth'))
+        pretrained_model.flatten_dim = int(512 * (input_size[0] / 32) * (input_size[1] / 32))
+        pretrained_model.linear1 = nn.Linear(pretrained_model.flatten_dim, 1024)
         pretrained_model.linear2 = LinearClassifier(512, n_classes)
-        transform_in = torchvision.transforms.Resize(input_size)
+        transform_in = None #A.Resize(input_size[0], input_size[1])
 
         def get_last_layer_diabetic_retinop(model):
             return model.linear2

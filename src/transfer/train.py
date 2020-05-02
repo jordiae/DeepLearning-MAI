@@ -145,8 +145,7 @@ def main():
             [
                 A.Normalize(
                     mean=[0.485, 0.456, 0.406],
-                    std=[0.229, 0.224, 0.225]),
-                ToTensorV2()
+                    std=[0.229, 0.224, 0.225])
             ])
 
     if not args.no_augment:
@@ -187,8 +186,7 @@ def main():
                 ),
                 A.Normalize(
                     mean=[0.485, 0.456, 0.406],
-                    std=[0.229, 0.224, 0.225]),
-                ToTensorV2()
+                    std=[0.229, 0.224, 0.225])
             ],
             p=1
         )
@@ -196,8 +194,11 @@ def main():
         aug_transform = transform
 
     if size_transform is not None:
-        transform = A.Compose([transform, size_transform])
-        aug_transform = A.Compose([aug_transform, size_transform])
+        transform = A.Compose([transform, size_transform, ToTensorV2()])
+        aug_transform = A.Compose([aug_transform, size_transform, ToTensorV2()])
+    else:
+        transform = A.Compose([transform, ToTensorV2()])
+        aug_transform = A.Compose([aug_transform, ToTensorV2()])
 
     train_dataset = Mit67Dataset(os.path.join(data_path, 'train'), transform=aug_transform)
     valid_dataset = Mit67Dataset(os.path.join(data_path, 'valid'), transform=transform)
