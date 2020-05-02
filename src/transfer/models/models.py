@@ -107,7 +107,7 @@ def build_pretrained(pretrained_model: str, pretrained: bool, n_classes: int, in
 
         get_last_layer = get_last_layer_resnet
     elif pretrained_model == 'food-11':
-        MainModel = imp.load_source('MainModel', os.path.join('pretrained_models','food_11', 'model_converted.py'))
+        imp.load_source('MainModel', os.path.join('pretrained_models','food_11', 'model_converted.py'))
         pretrained_model = torch.load(os.path.join('pretrained_models','food_11', 'model_converted.pth'))
         pretrained_model.dense_3 = LinearClassifier(256, n_classes)
         transform_in = None
@@ -116,6 +116,17 @@ def build_pretrained(pretrained_model: str, pretrained: bool, n_classes: int, in
             return model.dense_3
 
         get_last_layer = get_last_layer_food_11
+
+    elif pretrained_model == 'diabetic-retinop':
+        imp.load_source('model', os.path.join('pretrained_models', 'diabetic_retinop', 'model.py'))
+        pretrained_model = torch.load(os.path.join('pretrained_models', 'diabetic_retinop', 'model.pth'))
+        pretrained_model.linear2 = LinearClassifier(512, n_classes)
+        transform_in = torchvision.transforms.Resize(input_size)
+
+        def get_last_layer_diabetic_retinop(model):
+            return model.linear2
+
+        get_last_layer = get_last_layer_diabetic_retinop
 
     else:
         raise NotImplementedError(f'Pretrained model: {pretrained_model}')

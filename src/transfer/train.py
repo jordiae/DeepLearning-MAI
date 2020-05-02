@@ -196,8 +196,8 @@ def main():
         aug_transform = transform
 
     if size_transform is not None:
-        transform = A.Compose(transform, size_transform)
-        aug_transform = A.Compose(aug_transform, size_transform)
+        transform = A.Compose([transform, size_transform])
+        aug_transform = A.Compose([aug_transform, size_transform])
 
     train_dataset = Mit67Dataset(os.path.join(data_path, 'train'), transform=aug_transform)
     valid_dataset = Mit67Dataset(os.path.join(data_path, 'valid'), transform=transform)
