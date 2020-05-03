@@ -107,7 +107,7 @@ def main():
                         default='fine-tuning')
     parser.add_argument('--pre-conv', action='store_true', help='Whether to add a new convolutional layer')
     parser.add_argument('--data', type=str, help='Dataset', default='256x256-split')
-    parser.add_argument('--epochs', type=int, help='Number of epochs', default=100)
+    parser.add_argument('--epochs', type=int, help='Number of epochs', default=200)
     parser.add_argument('--lr', type=float, help='Learning Rate', default=0.0001)
     parser.add_argument('--lr-pretrained', type=float, help='Learning Rate of the pre-trained model (ignored if'
                                                             'transfer-strategy is set to feature extraction')
@@ -117,7 +117,7 @@ def main():
     parser.add_argument('--criterion', type=str, help='Criterion', default='label-smooth')
     parser.add_argument('--smooth-criterion', type=float, help='Smoothness for label-smoothing', default=0.1)
     parser.add_argument('--early-stop', type=int,
-                        help='Patience in early stop in validation set (-1 -> no early stop)', default=5)
+                        help='Patience in early stop in validation set (-1 -> no early stop)', default=10)
     parser.add_argument('--weight-decay', type=float, help='Weight decay', default=0.001)
 
     args = parser.parse_args()
