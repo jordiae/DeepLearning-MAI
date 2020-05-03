@@ -9,8 +9,8 @@ RSYNC="rsync -a -e \"ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChec
 DEPLOY_ADDRESS=${USER}@${DATA_CLUSTER}
 DEPLOY_DIR=/home/nct01/$USER/
 
-echo "$RSYNC experiments src ${DEPLOY_ADDRESS}:${DEPLOY_DIR}"
-bash -c "$RSYNC experiments src ${DEPLOY_ADDRESS}:${DEPLOY_DIR}"
+echo "$RSYNC pretrained_models experiments src ${DEPLOY_ADDRESS}:${DEPLOY_DIR}"
+bash -c "$RSYNC pretrained_models experiments src ${DEPLOY_ADDRESS}:${DEPLOY_DIR}"
 
 if [ $? -ne 0 ]
 then
