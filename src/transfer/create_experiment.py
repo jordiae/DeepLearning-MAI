@@ -24,16 +24,16 @@ bash train.sh
 
 
 def create_train_bat(parameters):
-    relative_train_path = '/'.join(['..', '..', 'src', 'transfer', 'train.py'])
+    relative_train_path = '/'.join(['..', '..', '..', 'src', 'transfer', 'train.py'])
     bat = f'''python {relative_train_path} {parameters}'''
     return bat
 
 
 def create_train_script(parameters):
-    relative_train_path = '/'.join(['..', '..', 'src', 'transfer', 'train.py'])
+    relative_train_path = '/'.join(['..', '..', '..', 'src', 'transfer', 'train.py'])
     script = '''#!/bin/bash
-source ../../venv/bin/activate
-src_path="$(realpath ../../src)"
+source ../../../venv/bin/activate
+src_path="$(realpath ../../../src)"
 export PYTHONPATH="${PYTHONPATH}:${src_path}"'''
     script += f'\npython {relative_train_path} {parameters}'
     return script
@@ -45,7 +45,7 @@ def create_experiment(name, parameters):
     slurm_debug_script = create_slurm_script(name, 'debug', '00:15:00')
     slurm_main_script = create_slurm_script(name, 'training', '16:00:00')
     timestamp = time.strftime("%Y-%m-%d-%H%M")
-    exp_dir = os.path.join('..', '..', 'experiments', f'{name}-{timestamp}')
+    exp_dir = os.path.join('..', '..', 'experiments', 'transfer', f'{name}-{timestamp}')
     os.makedirs(exp_dir)
     with open(os.path.join(exp_dir, 'train.sh'), 'w', newline='\n') as f:
         f.write(train_script)

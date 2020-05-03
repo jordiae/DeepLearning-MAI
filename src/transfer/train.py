@@ -14,6 +14,7 @@ from transfer.utils import load_model
 from transfer.utils import LabelSmoothingLoss
 import numpy as np
 from transfer.utils import ComposedOptimizer
+import pathlib
 
 
 def train(args: argparse.Namespace, train_loader: torch.utils.data.DataLoader,
@@ -139,7 +140,11 @@ def main():
                                        transfer_strategy=args.transfer_strategy, pre_conv=args.pre_conv)
 
     logging.info('===> Loading datasets')
-    data_path = os.path.join('..', '..', 'data', 'mit67', args.data)
+    script_path = os.path.join(pathlib.Path(__file__).parent.absolute())
+    if os.getcwd() == script_path:
+        data_path = os.path.join('..', '..', 'data', 'mit67', args.data)
+    else:
+        data_path = os.path.join('..', '..', '..', 'data', 'mit67', args.data)
 
     transform = A.Compose(
             [
