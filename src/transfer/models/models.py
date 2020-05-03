@@ -11,6 +11,8 @@ from typing import Optional
 from typing import Callable
 from typing import Iterable
 import albumentations as A
+import os
+import torchvision.models
 
 SCRIPT_PATH = os.path.join(pathlib.Path(__file__).parent.absolute())
 
@@ -97,11 +99,12 @@ def build_pretrained(pretrained_model: str, pretrained: bool, n_classes: int, in
     current_dir = os.getcwd()
     os.chdir(SCRIPT_PATH)
     os.chdir(os.path.join('..', '..', '..'))
-    torch.hub.set_dir('pretrained_models')
+    pretrained_dir = 'pretrained_models'
+    torch.hub.set_dir(pretrained_dir)
     if pretrained_model == 'resnet-18-imagenet':
         pretrained_model = torch.hub.load('pytorch/vision:v0.6.0', 'resnet18', pretrained=pretrained)
         pretrained_model.fc = LinearClassifier(512, n_classes)
-        transform_in = None  # torchvision.transforms.Resize(input_size)
+        transform_in = None
 
         def get_last_layer_resnet(resnet):
             return resnet.fc
@@ -111,36 +114,67 @@ def build_pretrained(pretrained_model: str, pretrained: bool, n_classes: int, in
     elif pretrained_model == 'resnet-50-imagenet':
         pretrained_model = torch.hub.load('pytorch/vision:v0.6.0', 'resnet50', pretrained=pretrained)
         pretrained_model.fc = LinearClassifier(2048, n_classes)
-        transform_in = None  # torchvision.transforms.Resize(input_size)
+        transform_in = None
 
         def get_last_layer_resnet(resnet):
             return resnet.fc
 
         get_last_layer = get_last_layer_resnet
 
-    elif pretrained_model == 'food-11':
-        imp.load_source('MainModel', os.path.join('pretrained_models','food_11', 'model_converted.py'))
-        pretrained_model = torch.load(os.path.join('pretrained_models','food_11', 'model_converted.pth'))
-        pretrained_model.dense_3 = LinearClassifier(256, n_classes)
+    elif pretrained_model == 'resnet-18-places':
+        places = torch.load(os.path.join(pretrained_dir, 'resnet18_places365.pth.tar'), map_location=torch.device('cpu'))
+        model = torchvision.models.__dict__[places['arch']](num_classes=365)
+        checkpoint = places
+        state_dict = {str.replace(k, 'module.', ''): v for k, v in checkpoint['state_dict'].items()}
+        model.load_state_dict(state_dict)
+        model.fc = LinearClassifier(512, n_classes)
+        pretrained_model = model
         transform_in = None
 
-        def get_last_layer_food_11(model):
-            return model.dense_3
+        def get_last_layer_resnet(resnet):
+            return resnet.fc
 
-        get_last_layer = get_last_layer_food_11
+        get_last_layer = get_last_layer_resnet
 
-    elif pretrained_model == 'diabetic-retinop':
-        imp.load_source('model', os.path.join('pretrained_models', 'diabetic_retinop', 'model.py'))
-        pretrained_model = torch.load(os.path.join('pretrained_models', 'diabetic_retinop', 'model.pth'))
-        pretrained_model.flatten_dim = int(512 * (input_size[0] / 32) * (input_size[1] / 32))
-        pretrained_model.linear1 = nn.Linear(pretrained_model.flatten_dim, 1024)
-        pretrained_model.linear2 = LinearClassifier(512, n_classes)
-        transform_in = None #A.Resize(input_size[0], input_size[1])
+    elif pretrained_model == 'resnet-50-places':
+        places = torch.load(os.path.join(pretrained_dir, 'resnet50_places365.pth.tar'),
+                            map_location=torch.device('cpu'))
+        model = torchvision.models.__dict__[places['arch']](num_classes=365)
+        checkpoint = places
+        state_dict = {str.replace(k, 'module.', ''): v for k, v in checkpoint['state_dict'].items()}
+        model.load_state_dict(state_dict)
+        model.fc = LinearClassifier(512, n_classes)
+        pretrained_model = model
+        transform_in = None
 
-        def get_last_layer_diabetic_retinop(model):
-            return model.linear2
+        def get_last_layer_resnet(resnet):
+            return resnet.fc
 
-        get_last_layer = get_last_layer_diabetic_retinop
+        get_last_layer = get_last_layer_resnet
+
+    # elif pretrained_model == 'food-11':
+    #     imp.load_source('MainModel', os.path.join('pretrained_models','food_11', 'model_converted.py'))
+    #     pretrained_model = torch.load(os.path.join('pretrained_models','food_11', 'model_converted.pth'))
+    #     pretrained_model.dense_3 = LinearClassifier(256, n_classes)
+    #     transform_in = None
+    #
+    #     def get_last_layer_food_11(model):
+    #         return model.dense_3
+    #
+    #     get_last_layer = get_last_layer_food_11
+    #
+    # elif pretrained_model == 'diabetic-retinop':
+    #     imp.load_source('model', os.path.join('pretrained_models', 'diabetic_retinop', 'model.py'))
+    #     pretrained_model = torch.load(os.path.join('pretrained_models', 'diabetic_retinop', 'model.pth'))
+    #     pretrained_model.flatten_dim = int(512 * (input_size[0] / 32) * (input_size[1] / 32))
+    #     pretrained_model.linear1 = nn.Linear(pretrained_model.flatten_dim, 1024)
+    #     pretrained_model.linear2 = LinearClassifier(512, n_classes)
+    #     transform_in = None #A.Resize(input_size[0], input_size[1])
+    #
+    #     def get_last_layer_diabetic_retinop(model):
+    #         return model.linear2
+    #
+    #     get_last_layer = get_last_layer_diabetic_retinop
 
     else:
         raise NotImplementedError(f'Pretrained model: {pretrained_model}')
@@ -153,9 +187,16 @@ def download_models():
     current_dir = os.getcwd()
     os.chdir(SCRIPT_PATH)
     os.chdir(os.path.join('..', '..', '..'))
-    os.makedirs('pretrained_models')
-    torch.hub.set_dir('pretrained_models')
-    model = torch.hub.load('pytorch/vision:v0.6.0', 'resnet18', pretrained=True)
+    pretrained_dir = 'pretrained_models'
+    if not os.path.exists(pretrained_dir):
+        os.makedirs(pretrained_dir)
+    torch.hub.set_dir(pretrained_dir)
+    _ = torch.hub.load('pytorch/vision:v0.6.0', 'resnet18', pretrained=True)
+    _ = torch.hub.load('pytorch/vision:v0.6.0', 'resnet50', pretrained=True)
+    _ = torch.hub.load_state_dict_from_url('http://places2.csail.mit.edu/models_places365/resnet18_places365.pth.tar',
+                                           model_dir=pretrained_dir, map_location=torch.device('cpu'))
+    _ = torch.hub.load_state_dict_from_url('http://places2.csail.mit.edu/models_places365/resnet50_places365.pth.tar',
+                                           model_dir=pretrained_dir, map_location=torch.device('cpu'))
     os.chdir(current_dir)
 
 
