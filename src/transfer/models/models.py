@@ -100,7 +100,7 @@ def build_pretrained(pretrained_model: str, pretrained: bool, n_classes: int, in
     os.chdir(SCRIPT_PATH)
     os.chdir(os.path.join('..', '..', '..'))
     pretrained_dir = 'pretrained_models'
-    torch.hub.set_dir(pretrained_dir)
+    torch.hub.set_dir(os.path.abspath(pretrained_dir)) # Beware: https://github.com/pytorch/pytorch/issues/31944
     if pretrained_model == 'resnet-18-imagenet':
         pretrained_model = torch.hub.load('pytorch/vision:v0.6.0', 'resnet18', pretrained=pretrained)
         pretrained_model.fc = LinearClassifier(512, n_classes)
@@ -190,7 +190,7 @@ def download_models():
     pretrained_dir = 'pretrained_models'
     if not os.path.exists(pretrained_dir):
         os.makedirs(pretrained_dir)
-    torch.hub.set_dir(pretrained_dir)
+    torch.hub.set_dir(os.path.abspath(pretrained_dir))  # Beware: https://github.com/pytorch/pytorch/issues/31944
     _ = torch.hub.load('pytorch/vision:v0.6.0', 'resnet18', pretrained=True)
     _ = torch.hub.load('pytorch/vision:v0.6.0', 'resnet50', pretrained=True)
     _ = torch.hub.load_state_dict_from_url('http://places2.csail.mit.edu/models_places365/resnet18_places365.pth.tar',
