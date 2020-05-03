@@ -107,6 +107,17 @@ def build_pretrained(pretrained_model: str, pretrained: bool, n_classes: int, in
             return resnet.fc
 
         get_last_layer = get_last_layer_resnet
+
+    elif pretrained_model == 'resnet-50-imagenet':
+        pretrained_model = torch.hub.load('pytorch/vision:v0.6.0', 'resnet50', pretrained=pretrained)
+        pretrained_model.fc = LinearClassifier(2048, n_classes)
+        transform_in = None  # torchvision.transforms.Resize(input_size)
+
+        def get_last_layer_resnet(resnet):
+            return resnet.fc
+
+        get_last_layer = get_last_layer_resnet
+
     elif pretrained_model == 'food-11':
         imp.load_source('MainModel', os.path.join('pretrained_models','food_11', 'model_converted.py'))
         pretrained_model = torch.load(os.path.join('pretrained_models','food_11', 'model_converted.pth'))
