@@ -50,7 +50,7 @@ class TransferModel(nn.Module):
         self.model = model
         self.get_last_layer = get_last_layer
         self.transfer_strategy = transfer_strategy
-        if self.transfer_strategy == 'feature-extraction':
+        if self.transfer_strategy in ['feature-extraction', 'feature-extraction-freeze-batchnorm-dropout']:
             for param in self.model.parameters():
                 param.requires_grad = False
             for param in self.get_last_layer(model).parameters():
