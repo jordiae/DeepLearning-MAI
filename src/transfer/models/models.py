@@ -143,7 +143,7 @@ def build_pretrained(pretrained_model: str, pretrained: bool, n_classes: int, in
         checkpoint = places
         state_dict = {str.replace(k, 'module.', ''): v for k, v in checkpoint['state_dict'].items()}
         model.load_state_dict(state_dict)
-        model.fc = LinearClassifier(512, n_classes)
+        model.fc = LinearClassifier(2048, n_classes)
         pretrained_model = model
         transform_in = None
 
