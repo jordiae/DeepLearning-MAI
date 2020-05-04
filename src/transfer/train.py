@@ -15,6 +15,7 @@ from transfer.utils import LabelSmoothingLoss
 import numpy as np
 from transfer.utils import ComposedOptimizer
 import pathlib
+import time
 
 
 def train(args: argparse.Namespace, train_loader: torch.utils.data.DataLoader,
@@ -31,8 +32,14 @@ def train(args: argparse.Namespace, train_loader: torch.utils.data.DataLoader,
         json.dump(args.__dict__, f, indent=2)
     logging.info(args)
     logging.info(model)
+
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in model.parameters())
+    logging.info(f'Training {trainable_params} parameters (total: {total_params})')
+
     best_valid_metric = 0.0
     epochs_without_improvement = 0
+    t0 = time.time()
 
     for epoch in range(args.epochs):
         # train step (full epoch)
@@ -91,6 +98,9 @@ def train(args: argparse.Namespace, train_loader: torch.utils.data.DataLoader,
             if args.early_stop != -1 and epochs_without_improvement == args.early_stop:
                 break
         logging.info(f'{epochs_without_improvement} epochs without improvement in validation set')
+
+    t1 = time.time()
+    logging.info(f'Finished training in {t1-t0:.1f}s')
 
     model.load_state_dict(torch.load('checkpoint_best.pt'))
     model.to(device)
