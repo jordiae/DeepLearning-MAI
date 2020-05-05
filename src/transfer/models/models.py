@@ -152,29 +152,18 @@ def build_pretrained(pretrained_model: str, pretrained: bool, n_classes: int, in
 
         get_last_layer = get_last_layer_resnet
 
-    # elif pretrained_model == 'food-11':
-    #     imp.load_source('MainModel', os.path.join('pretrained_models','food_11', 'model_converted.py'))
-    #     pretrained_model = torch.load(os.path.join('pretrained_models','food_11', 'model_converted.pth'))
-    #     pretrained_model.dense_3 = LinearClassifier(256, n_classes)
-    #     transform_in = None
-    #
-    #     def get_last_layer_food_11(model):
-    #         return model.dense_3
-    #
-    #     get_last_layer = get_last_layer_food_11
-    #
-    # elif pretrained_model == 'diabetic-retinop':
-    #     imp.load_source('model', os.path.join('pretrained_models', 'diabetic_retinop', 'model.py'))
-    #     pretrained_model = torch.load(os.path.join('pretrained_models', 'diabetic_retinop', 'model.pth'))
-    #     pretrained_model.flatten_dim = int(512 * (input_size[0] / 32) * (input_size[1] / 32))
-    #     pretrained_model.linear1 = nn.Linear(pretrained_model.flatten_dim, 1024)
-    #     pretrained_model.linear2 = LinearClassifier(512, n_classes)
-    #     transform_in = None #A.Resize(input_size[0], input_size[1])
-    #
-    #     def get_last_layer_diabetic_retinop(model):
-    #         return model.linear2
-    #
-    #     get_last_layer = get_last_layer_diabetic_retinop
+    elif pretrained_model == 'diabetic-retinop':
+        imp.load_source('model', os.path.join('pretrained_models', 'diabetic_retinop', 'model.py'))
+        pretrained_model = torch.load(os.path.join('pretrained_models', 'diabetic_retinop', 'best_model.pth'))
+        #pretrained_model.flatten_dim = int(512 * (input_size[0] / 32) * (input_size[1] / 32))
+        #pretrained_model.linear1 = nn.Linear(pretrained_model.flatten_dim, 1024)
+        pretrained_model.linear2 = LinearClassifier(512, n_classes)
+        transform_in = A.Resize(448, 448)
+
+        def get_last_layer_diabetic_retinop(model):
+            return model.linear2
+
+        get_last_layer = get_last_layer_diabetic_retinop
 
     else:
         raise NotImplementedError(f'Pretrained model: {pretrained_model}')

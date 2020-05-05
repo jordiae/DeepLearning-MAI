@@ -156,11 +156,18 @@ def main():
     else:
         data_path = os.path.join('..', '..', '..', 'data', 'mit67', args.data)
 
+    if args.from_pretrained == 'diabetic-retinop':
+        normalization_transform = A.Normalize(
+                                    mean=[0.48203543, 0.34901473, 0.2678768],
+                                    std=[0.26377094, 0.19481263, 0.15918098])
+    else:
+        normalization_transform = A.Normalize(
+                                    mean=[0.485, 0.456, 0.406],
+                                    std=[0.229, 0.224, 0.225])
+
     transform = A.Compose(
             [
-                A.Normalize(
-                    mean=[0.485, 0.456, 0.406],
-                    std=[0.229, 0.224, 0.225])
+                normalization_transform
             ])
 
     if not args.no_augment:
@@ -199,9 +206,7 @@ def main():
                     ],
                     p=0.2
                 ),
-                A.Normalize(
-                    mean=[0.485, 0.456, 0.406],
-                    std=[0.229, 0.224, 0.225])
+                normalization_transform
             ],
             p=1
         )
