@@ -63,8 +63,10 @@ class TransferModel(nn.Module):
         return self.model(x)
 
     def get_trainable_parameters(self) -> Iterable[nn.Parameter]:
-        if self.preconv is not None and self.transfer_strategy == 'fine-tuning':
+        if self.preconv is not None and self.transfer_strategy in ['fine-tuning', 'fine-tuning-freeze-batchnorm']:
             return chain(self.preconv.parameters(), self.model.parameters())
+        elif self.transfer_strategy in ['fine-tuning', 'fine-tuning-freeze-batchnorm']:
+            return self.model.parameters()
         elif self.preconv is not None and self.transfer_strategy in ['feature-extraction',
                                                                      'feature-extraction-freeze-batchnorm-dropout']:
             return chain(self.preconv.parameters(), self.get_last_layer(self.model).parameters())
@@ -87,6 +89,13 @@ class TransferModel(nn.Module):
             self.model.train(*args, **kwargs)
         else:
             self.get_last_layer(self.model).train(*args, **kwargs)
+        if self.transfer_strategy == 'fine-tuning-freeze-batchnorm':
+            def set_bn_eval(m):
+                classname = m.__class__.__name__
+                if classname.find('BatchNorm') != -1:
+                    m.eval()
+
+            self.model.apply(set_bn_eval)
 
     def eval(self, *args, **kwargs):
         if self.preconv is not None:

@@ -113,8 +113,9 @@ def main():
     parser = argparse.ArgumentParser(description='Train a CNN for mit67, based on a pre-train model')
     parser.add_argument('--from-pretrained', type=str, help='Pre-trained model to learn', default='resnet-18-imagenet')
     parser.add_argument('--transfer-strategy', type=str, help='Transfer learning strategy (fine-tuning,'
-                                                              'feature-extraction, or'
-                                                              'feature-extraction-freeze-batchnorm-dropout)',
+                                                              'feature-extraction,'
+                                                              'feature-extraction-freeze-batchnorm-dropout or'
+                                                              'fine-tuning-freeze-batchnorm)',
                         default='fine-tuning')
     parser.add_argument('--pre-conv', action='store_true', help='Whether to add a new convolutional layer')
     parser.add_argument('--data', type=str, help='Dataset', default='256x256-split')
@@ -137,7 +138,7 @@ def main():
         args.lr_pretrained = args.lr
 
     assert args.transfer_strategy in ['fine-tuning', 'feature-extraction',
-                                      'feature-extraction-freeze-batchnorm-dropout']
+                                      'feature-extraction-freeze-batchnorm-dropout', 'fine-tuning-freeze-batchnorm']
 
     log_path = 'train.log'
 
