@@ -164,8 +164,6 @@ def build_pretrained(pretrained_model: str, pretrained: bool, n_classes: int, in
     elif pretrained_model == 'diabetic-retinop':
         imp.load_source('model', os.path.join('pretrained_models', 'diabetic_retinop', 'model.py'))
         pretrained_model = torch.load(os.path.join('pretrained_models', 'diabetic_retinop', 'best_model.pth'))
-        #pretrained_model.flatten_dim = int(512 * (input_size[0] / 32) * (input_size[1] / 32))
-        #pretrained_model.linear1 = nn.Linear(pretrained_model.flatten_dim, 1024)
         pretrained_model.linear2 = LinearClassifier(512, n_classes)
         transform_in = A.Resize(448, 448)
 
