@@ -10,7 +10,7 @@ grpcio==1.27.2
 idna==2.9
 joblib==0.14.1
 Markdown==3.2.1
-numpy==1.18.1
+numpy==1.22.0
 oauthlib==3.1.0
 Pillow==7.0.0
 protobuf==3.11.3
